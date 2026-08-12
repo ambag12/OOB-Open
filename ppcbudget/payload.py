@@ -12,11 +12,17 @@ from .ingest import QaReport, WorkbookMeta
 from .metrics import ModelSettings, Totals, hourly_starvation
 from .scoring import IN, NA, OOB, PAUSED, CampaignDay
 
+# The timeline strips are one gradient per campaign-day, so these four values
+# are baked into the payload and have to hold up on both the light and the dark
+# surface. Checked for colour-vision separation across every pair, not just
+# neighbours: the tightest is paused against in-budget at dE 9.3 (protan) and
+# 15.8 with normal vision. Paused is deliberately a cool neutral -- tinting it
+# green to match the brand put it right on top of in-budget.
 TRACK_COLOR = {
-    IN: "#16a34a",
-    OOB: "#dc2626",
-    PAUSED: "#9ca3af",
-    NA: "#e5e7eb",
+    IN: "#0f9a74",       # brand deep green lifted to read on a dark surface
+    OOB: "#f2542d",      # functional warning; the brand guide has no such colour
+    PAUSED: "#9aa6ad",   # nothing is happening, so it recedes
+    NA: "#cbdbd4",       # not yet created: near-absent, labelled in the legend
 }
 STATE_LABEL = {IN: "In budget", OOB: "Out of budget", PAUSED: "Paused", NA: "Not yet created"}
 

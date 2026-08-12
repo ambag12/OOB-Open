@@ -3,11 +3,14 @@
 Finds the campaigns that keep running out of budget, how long they were dark,
 how often it happened, and what it plausibly cost.
 
-Two ways to use it. Both run the same analysis code, so they can never
-disagree — the dashboard just makes it explorable and the report makes it
-shareable.
+Three ways to use it. All of them run the same analysis code — `ppcbudget/`
+via `app/services/analysis.py` — so they can never disagree. The dashboard
+makes it explorable, the report makes it shareable, and the hosted version
+makes it available to a team.
 
-## The dashboard
+## Local mode — your files never leave your machine
+
+### The dashboard
 
 ```bash
 python3 serve.py
@@ -18,16 +21,24 @@ Sort and filter by any column, click a campaign for its full timeline and
 outage list, and download the Excel or CSV version from the header.
 
 Add `--preload` to pick up whatever is already sitting in `data/` on startup.
-The server binds to localhost only; nothing is uploaded anywhere.
+The server binds to localhost only; nothing is uploaded anywhere, and there are
+no accounts, no database and nothing to install beyond `openpyxl`.
 
-## The Excel report
+### The Excel report
 
 ```bash
 python3 run_report.py
 ```
 
-Put your exports in `data/` first. The report lands in `reports/`. Nothing to
-install — it uses `openpyxl`, which you already have.
+Put your exports in `data/` first. The report lands in `reports/`. Same
+dependencies as above: just `openpyxl`.
+
+## Hosted mode — accounts, on a server
+
+The hosted version is the same dashboard with sign-in in front of it. **Files
+you upload here do go to the server**, where they are analysed and then deleted
+when you sign out or go idle; nobody else with an account can see them. Accounts
+live in MySQL. See [Running the hosted version](#running-the-hosted-version).
 
 ## Loading more than one day
 
@@ -156,16 +167,110 @@ zero would become a fact the moment someone summed the column.
 budget, so paused minutes are removed from both the loss total and the
 in-budget denominator that sets the spend rate.
 
+## Running the hosted version
+
+The hosted app is FastAPI (`app/`), serving the same dashboard behind sign-in.
+Accounts, sessions and email tokens live in MySQL in three `oob_`-prefixed
+tables. Uploads and the last analysis stay in memory and in a scratch directory,
+keyed by user — they are not written to the database and do not survive a
+restart.
+
+### Configuration
+
+Copy `.env.example` to `.env` and fill it in. Four settings have no sensible
+default and matter more than the rest:
+
+| Setting | Why it matters |
+| --- | --- |
+| `APP_BASE_URL` | Verification and reset links are built from it. Point it at wherever people actually reach the app, or every emailed link is dead. No trailing slash. |
+| `SECRET_KEY` | Keys the session-cookie and email-token fingerprints. Generate with `python -c "import secrets; print(secrets.token_urlsafe(48))"`. Rotating it signs everyone out and voids pending email links. |
+| `COOKIE_SECURE` | Leave `false` over plain HTTP. Set it `true` there and the browser silently discards the session cookie, so signing in appears to do nothing. Blank derives it from `APP_BASE_URL`. |
+| `EMAIL_PROVIDER` | `api` posts to `EMAIL_ENDPOINT`; `console` just logs the message and its link, which is how to exercise signup and reset without sending real mail. |
+
+`ADMIN_EMAIL` and `ADMIN_PASSWORD` seed an administrator on first startup,
+already confirmed. Later startups repair the account's flags but leave the
+password alone, so rotating it in the app sticks — set `ADMIN_RESET_PASSWORD=true`
+for one boot if you need to force it back.
+
+### With Docker
+
+```bash
+docker compose up -d --build
+docker compose ps            # healthy
+curl -s localhost:8000/readyz   # {"db":"ok"} proves it can reach MySQL
+```
+
+The compose file starts the app only; the database is whatever `MYSQL_HOST`
+points at. The EC2 instance's security group has to be allowed inbound on 3306
+at RDS.
+
+### Without Docker
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python -m app.db     # create the tables, seed the admin
+.venv/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 1
+```
+
+**One worker is load-bearing.** Uploads and the last analysis live in the
+process's memory, so a second worker would answer half the requests without
+them. Growing past one box means moving that state out of memory first.
+
+### Branding
+
+The dashboard, the auth pages and the Excel report all follow the Utopia Brands
+guidelines. The brand swatches live verbatim in the `--u-*` custom properties at
+the top of `web/styles.css` and everything else derives from them; the Excel
+palette is the matching set of constants at the top of `ppcbudget/excelout.py`.
+
+Two colours are deliberately **not** from the guide. The guide covers identity,
+not function, and has no warning colour — but this dashboard exists to show
+campaigns going dark, so out-of-budget has to read as a problem. `--red` and
+`--amber` are tuned to sit against the brand greens and are only ever used to
+encode state.
+
+Headings are set in Belleza and body copy in Neue Montreal, per the guide's
+typeface hierarchy. Neither font file ships with the repository — see
+[web/fonts/README.md](web/fonts/README.md) for how to add them. Until they are
+there, both fall back to close system faces and the `@font-face` request for
+Belleza 404s harmlessly.
+
+The mark in the top bar is a placeholder built from the two brand primaries.
+Replace it with the real emblem when the SVG is available rather than redrawing
+it — `.mark` in `web/styles.css`.
+
+### Schema changes
+
+Tables are created with `create_all` on startup. That creates missing tables but
+never alters existing ones, so the first time a column is added you either run
+the `ALTER` by hand or adopt Alembic then. Three tables did not justify a
+migrations tree up front.
+
+### Before it faces the internet
+
+The app is built so TLS is a configuration change rather than a rewrite: set
+`APP_BASE_URL=https://…` and the session cookie picks up `Secure` on its own.
+Until then, passwords and session cookies cross the network in the clear. If you
+put a proxy in front, add `--proxy-headers --forwarded-allow-ips=<proxy ip>` to
+the uvicorn command — but not while port 8000 is exposed directly, where it
+would let a client spoof `X-Forwarded-For` and walk past the per-IP rate limits.
+
 ## Tests
 
 ```bash
-python3 tests/test_golden.py
+python3 tests/test_golden.py       # the analysis
+python3 tests/test_auth_smoke.py   # the hosted app
 ```
 
-34 checks: frozen totals from the reference export, structural invariants,
-overlapping-export handling, action classification, and edge cases. The
-important ones are `test_chain_breaks_canary` and
-`test_amazon_pacing_rows_are_not_actions`.
+`test_golden.py` is 34 checks: frozen totals from the reference export,
+structural invariants, overlapping-export handling, action classification, and
+edge cases. The important ones are `test_chain_breaks_canary` and
+`test_amazon_pacing_rows_are_not_actions`. It needs the reference export in
+`data/`; the 15 synthetic-fixture checks run without it.
+
+`test_auth_smoke.py` is 53 checks covering the whole account lifecycle plus
+upload, analyse and export. It runs against in-memory SQLite with mail captured
+rather than sent, so it needs no MySQL, no network and no configuration.
 
 The export is written newest-first, so rows sharing the same minute are also
 newest-first and must be reversed before the state machine walks them. Sorting

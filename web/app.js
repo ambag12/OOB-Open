@@ -59,12 +59,13 @@ function renderFileList() {
 }
 
 async function upload(file, kind) {
-  const body = await file.arrayBuffer();
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    headers: { 'X-Filename': encodeURIComponent(file.name).replace(/%20/g, ' '), 'X-Kind': kind },
-    body,
-  });
+  // FormData rather than a raw body: the filename travels in the part header,
+  // so no X-Filename escaping, and the server can stream it to disk instead of
+  // holding the whole thing in memory.
+  const form = new FormData();
+  form.append('file', file);
+  form.append('kind', kind);
+  const res = await A.api('/api/upload', { method: 'POST', body: form });
   if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error || 'Upload failed');
   state.files.push({ name: file.name, kind });
   renderFileList();
@@ -92,7 +93,7 @@ async function analyze() {
   let i = 0;
   const tick = setInterval(() => { $('loading-text').textContent = steps[++i % steps.length]; }, 900);
   try {
-    const res = await fetch('/api/analyze', {
+    const res = await A.api('/api/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(state.settings),
@@ -160,15 +161,20 @@ function renderAnswer(t, m) {
     `able to run &mdash; and <b class="out">${hrs(a.out)}</b> shut off because it hit its daily budget.` +
     (a.paused > 0.05 ? ` A further ${hrs(a.paused)} it was paused, which costs nothing.` : '');
 
+  // Same four values as TRACK_COLOR in ppcbudget/payload.py -- the day bar and
+  // the timeline strips have to agree.
   const segs = [
-    ['running', a.running, '#16a34a', 'Running'],
-    ['out', a.out, '#dc2626', 'Out of budget'],
-    ['paused', a.paused, '#9ca3af', 'Paused'],
-    ['na', a.na, '#e5e7eb', 'Not yet created'],
+    ['running', a.running, '#0f9a74', 'Running'],
+    ['out', a.out, '#f2542d', 'Out of budget'],
+    ['paused', a.paused, '#9aa6ad', 'Paused'],
+    ['na', a.na, '#cbdbd4', 'Not yet created'],
   ].filter(([, v]) => v > 0.01);
 
-  $('daybar').innerHTML = segs.map(([, v, color, label]) =>
-    `<span style="width:${(v / 24) * 100}%;background:${color}"
+  // The two recessive states are pale enough that the default white label
+  // disappears on them, so those segments get dark text instead.
+  $('daybar').innerHTML = segs.map(([key, v, color, label]) =>
+    `<span class="${key === 'na' || key === 'paused' ? 'on-pale' : ''}"
+           style="width:${(v / 24) * 100}%;background:${color}"
            title="${label}: ${hrs(v)}">${(v / 24) > 0.13 ? hrs(v) : ''}</span>`).join('');
   $('daykeys').innerHTML = segs.map(([, v, color, label]) =>
     `<div><i class="sw" style="background:${color}"></i>${label} <b>${hrs(v)}</b></div>`).join('');
@@ -326,12 +332,15 @@ function setColumns(mode, multi) {
   wrap.classList.toggle('multi', mode === 'day' && multi);
 }
 
-/** Colour for a day, on the same green-to-red scale as the hour heatmap. */
+/** Colour for a day: nothing lost is the in-budget green, and everything above
+ *  that rides one warm ramp. A single hue getting steadily darker, rather than
+ *  the yellow-orange-red rainbow it replaced -- with one hue, "worse" is
+ *  readable from the depth of the colour alone. */
 function heatColor(lostHours, eligibleHours) {
   const f = eligibleHours > 0 ? Math.min(1, lostHours / eligibleHours) : 0;
-  if (f <= 0.005) return '#16a34a';
-  const ramp = ['#fff9c4', '#ffecb3', '#ffe0b2', '#ffccbc', '#ffab91',
-                '#ff8a65', '#ef5350', '#dc2626', '#b71c1c'];
+  if (f <= 0.005) return '#0f9a74';
+  const ramp = ['#fdece7', '#fbd7cd', '#f9bfae', '#f7a58c', '#f4886a',
+                '#f2542d', '#d8431f', '#b53617', '#8f2810'];
   return ramp[Math.min(ramp.length - 1, Math.floor(f * ramp.length))];
 }
 
@@ -692,8 +701,13 @@ window.addEventListener('drop', (e) => e.preventDefault());
 $('btn-analyze').addEventListener('click', analyze);
 $('btn-error-back').addEventListener('click', () => stage(state.data ? 'dash' : 'upload'));
 
+$('btn-signout').addEventListener('click', async () => {
+  await fetch('/api/auth/logout', { method: 'POST' });
+  location.replace('/login');
+});
+
 $('btn-reset').addEventListener('click', async () => {
-  await fetch('/api/clear', { method: 'POST' });
+  await A.api('/api/clear', { method: 'POST' });
   state.data = null; state.files = []; state.diagnoses.clear();
   state.search = ''; $('search').value = ''; state.pricedOnly = false; $('only-priced').checked = false;
   state.staleOnly = false; $('only-stale').checked = false;
@@ -701,8 +715,28 @@ $('btn-reset').addEventListener('click', async () => {
   stage('upload');
 });
 
-$('btn-csv').addEventListener('click', () => { location.href = '/api/export?format=csv'; });
-$('btn-xlsx').addEventListener('click', () => { location.href = '/api/export?format=xlsx'; });
+// Fetched rather than navigated to, so a refusal renders in the UI instead of
+// dumping JSON into a new tab. The session cookie rides along either way.
+async function download(format) {
+  const res = await A.api('/api/export?format=' + format);
+  if (!res.ok) {
+    fail((await res.json().catch(() => ({}))).error || 'That export failed.');
+    return;
+  }
+  const name = /filename="([^"]+)"/.exec(res.headers.get('content-disposition') || '');
+  const url = URL.createObjectURL(await res.blob());
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name ? name[1] : 'ppc-budget-report.' + format;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  // Revoked on a later tick: Safari has not finished reading it synchronously.
+  setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+
+$('btn-csv').addEventListener('click', () => download('csv'));
+$('btn-xlsx').addEventListener('click', () => download('xlsx'));
 
 $('search').addEventListener('input', (ev) => { state.search = ev.target.value; applyFilters(); });
 $('only-priced').addEventListener('change', (ev) => { state.pricedOnly = ev.target.checked; applyFilters(); });
@@ -775,8 +809,15 @@ $('settings').addEventListener('close', (ev) => {
   analyze();
 });
 
-// Pick up anything preloaded from data/ on startup.
-fetch('/api/state').then((r) => r.json()).then((s) => {
+// Pick up whatever this account already has loaded. Routed through A.api so an
+// expired session redirects to the sign-in page rather than silently rendering
+// an empty dashboard.
+A.api('/api/state').then((r) => r.json()).then((s) => {
+  if (s.user) {
+    $('whoami').textContent = s.user.name || s.user.email;
+    $('whoami').title = s.user.email;
+    $('link-admin').hidden = !s.user.is_admin;
+  }
   state.files = s.history.map((n) => ({ name: n, kind: 'history' }));
   if (s.perf) state.files.push({ name: s.perf, kind: 'perf' });
   renderFileList();

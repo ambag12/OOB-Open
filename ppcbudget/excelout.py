@@ -26,23 +26,28 @@ from .scoring import CampaignDay
 
 # ------------------------------------------------------------------- palette
 
-NAVY = "1F3864"
-SLATE = "44546A"
+# Utopia Brands. The report is the artefact that leaves the building, so it
+# carries the same identity as the dashboard: deep green chrome on pale mint
+# panels. RED and AMBER are functional, not brand -- the guide has no warning
+# colour and a report about campaigns going dark needs one.
+DEEP = "004D43"    # brand primary, deep green
+MIST = "EAFFF4"    # brand primary, pale mint
+SLATE = "4A6B64"
 WHITE = "FFFFFF"
-GREEN = "16A34A"
-AMBER = "B45309"
-RED = "C0392B"
-GREY = "9E9E9E"
-PANEL = "F4F6FA"
+GREEN = "0F7A5C"
+AMBER = "A2600A"
+RED = "C9401F"
+GREY = "7C9A92"
+PANEL = MIST
 
-HDR_FILL = PatternFill("solid", fgColor=NAVY)
+HDR_FILL = PatternFill("solid", fgColor=DEEP)
 HDR_FONT = Font(color=WHITE, bold=True, size=10)
-TITLE_FONT = Font(color=NAVY, bold=True, size=20)
+TITLE_FONT = Font(color=DEEP, bold=True, size=20)
 SUB_FONT = Font(color=SLATE, size=10, italic=True)
-SECTION = Font(color=NAVY, bold=True, size=12)
+SECTION = Font(color=DEEP, bold=True, size=12)
 TILE_FILL = PatternFill("solid", fgColor=PANEL)
 KPI_LABEL = Font(color=SLATE, size=9, bold=True)
-KPI_VALUE = Font(color=NAVY, size=18, bold=True)
+KPI_VALUE = Font(color=DEEP, size=18, bold=True)
 KPI_ALARM = Font(color=RED, size=18, bold=True)
 KPI_NOTE = Font(color=GREY, size=8, italic=True)
 RUN_FONT = Font(color=GREEN, size=10)
@@ -50,29 +55,34 @@ LOST_FONT = Font(color=RED, size=10, bold=True)
 UNPRICED = Font(color=GREY, size=9, italic=True)
 # Per-date sub-columns run narrow, so they get their own smaller type.
 DAY_RUN_FONT = Font(color=GREEN, size=9)
-DAY_LOST_FONT = Font(color="7F1D1D", size=9, bold=True)
+DAY_LOST_FONT = Font(color="8F2810", size=9, bold=True)
 DAY_PAUSE_FONT = Font(color=GREY, size=9)
 
-EDGE = Side(style="thin", color="C9D2E3")
+EDGE = Side(style="thin", color="CFE8DC")
 BOX = Border(left=EDGE, right=EDGE, top=EDGE, bottom=EDGE)
 
-# Hour-of-day heat, reused so 60k cells share nine fill objects.
+# Hour-of-day heat, reused so 60k cells share nine fill objects. The first entry
+# is the "no time lost" bucket; the rest are one warm hue getting steadily
+# darker, matching heatColor() in web/app.js so the report and the dashboard
+# shade the same hour the same way.
 HEAT = [PatternFill("solid", fgColor=c) for c in
-        ("E8F5E9", "FFF9C4", "FFECB3", "FFE0B2", "FFCCBC",
-         "FFAB91", "FF8A65", "EF5350", "C62828")]
-PAUSED_FILL = PatternFill("solid", fgColor="E0E0E0")
-NA_FILL = PatternFill("solid", fgColor="F5F5F5")
-HEAT_FONT = Font(size=7, color="616161")
+        ("D3F6E8", "FDECE7", "FBD7CD", "F9BFAE", "F7A58C",
+         "F4886A", "F2542D", "D8431F", "B53617")]
+PAUSED_FILL = PatternFill("solid", fgColor="DDE5E3")
+NA_FILL = PatternFill("solid", fgColor="F2F8F5")
+HEAT_FONT = Font(size=7, color=SLATE)
 HEAT_FONT_DARK = Font(size=7, color=WHITE)
 
+# Same tints the dashboard's diagnosis pills use, so a reader moving between
+# the two sees one scheme.
 DIAGNOSIS_FILL = {
-    "Structurally underfunded": PatternFill("solid", fgColor="FFCDD2"),
-    "Exhausts early": PatternFill("solid", fgColor="FFE0B2"),
-    "Pacing thrash": PatternFill("solid", fgColor="E1BEE7"),
-    "Evening cap": PatternFill("solid", fgColor="FFF9C4"),
-    "Intermittent": PatternFill("solid", fgColor="E3F2FD"),
-    "Healthy": PatternFill("solid", fgColor="C8E6C9"),
-    "Mostly paused": PatternFill("solid", fgColor="ECEFF1"),
+    "Structurally underfunded": PatternFill("solid", fgColor="FFE4DC"),
+    "Exhausts early": PatternFill("solid", fgColor="FDEFD0"),
+    "Pacing thrash": PatternFill("solid", fgColor="E8E9FF"),
+    "Evening cap": PatternFill("solid", fgColor="FEF7E4"),
+    "Intermittent": PatternFill("solid", fgColor="F1FFD7"),
+    "Healthy": PatternFill("solid", fgColor="D3F6E8"),
+    "Mostly paused": PatternFill("solid", fgColor="E4F5EC"),
 }
 
 # A duration is a fraction of a day; [h] lets a total exceed 24 hours.
@@ -137,9 +147,9 @@ def _as_table(ws, name: str, last_row: int, last_col: int, first_row: int = 1) -
     ws.add_table(table)
 
 
-STALE_FILL = PatternFill("solid", fgColor="FFCDD2")
-WARM_FILL = PatternFill("solid", fgColor="FFF3CD")
-STALE_FONT = Font(color="7F1D1D", size=10, bold=True)
+STALE_FILL = PatternFill("solid", fgColor="FFE4DC")
+WARM_FILL = PatternFill("solid", fgColor="FDEFD0")
+STALE_FONT = Font(color="8F2810", size=10, bold=True)
 
 
 def _action_cells(ws, row: int, col: int, act) -> None:
@@ -373,9 +383,9 @@ def _sheet_campaigns_multi(wb: Workbook, rollups: list[CampaignRollup],
     for j in range(len(shown_dates)):
         letter = get_column_letter(base + 2 + j * 3)
         ws.conditional_formatting.add(f"{letter}2:{letter}{last_row}", ColorScaleRule(
-            start_type="num", start_value=0, start_color="E8F5E9",
-            mid_type="num", mid_value=0.5, mid_color="FFCC80",
-            end_type="num", end_value=1, end_color="C62828"))
+            start_type="num", start_value=0, start_color="D3F6E8",
+            mid_type="num", mid_value=0.5, mid_color="F7A58C",
+            end_type="num", end_value=1, end_color="8F2810"))
     _as_table(ws, "Campaigns", last_row, last_col)
     ws.freeze_panes = "B2"
 
@@ -676,7 +686,7 @@ def _sheet_method(wb: Workbook, settings: ModelSettings, metas: list[WorkbookMet
     ]
     row = 4
     for name, text in entries:
-        ws.cell(row=row, column=1, value=name).font = Font(bold=True, color=NAVY, size=10)
+        ws.cell(row=row, column=1, value=name).font = Font(bold=True, color=DEEP, size=10)
         ws.cell(row=row, column=1).alignment = Alignment(vertical="top")
         c = ws.cell(row=row, column=2, value=text)
         c.alignment = Alignment(wrap_text=True, vertical="top")
@@ -684,7 +694,7 @@ def _sheet_method(wb: Workbook, settings: ModelSettings, metas: list[WorkbookMet
         row += 1
 
     row += 1
-    ws.cell(row=row, column=1, value="Generated").font = Font(bold=True, color=NAVY, size=10)
+    ws.cell(row=row, column=1, value="Generated").font = Font(bold=True, color=DEEP, size=10)
     ws.cell(row=row, column=2,
             value=f"{datetime.now():%Y-%m-%d %H:%M} from "
                   + ", ".join(m.path.name for m in metas))

@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Create an account &middot; Out-of-Budget Dashboard</title>
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📉</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark"></span>
+    <div>
+      <h1>Out-of-Budget Dashboard</h1>
+      <p>Amazon Ads change history &rarr; which campaigns keep going dark</p>
+    </div>
+  </div>
+</header>
+
+<main class="auth">
+  <div class="panel" id="form-panel">
+    <h2>Create an account</h2>
+    <p class="sub">You will need to confirm your email address before you can sign in.</p>
+
+    <form id="form" novalidate>
+      <label>Name
+        <input type="text" id="name" autocomplete="name" maxlength="120" autofocus>
+      </label>
+      <label>Email
+        <input type="email" id="email" autocomplete="username" required>
+      </label>
+      <label>Password
+        <input type="password" id="password" autocomplete="new-password" required minlength="10">
+        <small>At least 10 characters. Length beats punctuation.</small>
+      </label>
+      <label>Confirm password
+        <input type="password" id="confirm" autocomplete="new-password" required>
+      </label>
+      <button type="submit" class="primary" id="submit">Create account</button>
+    </form>
+
+    <p id="note" class="msg" hidden></p>
+
+    <p class="alt">Already have an account? <a href="/login">Sign in</a></p>
+  </div>
+
+  <div class="panel centre" id="done-panel" hidden>
+    <h2>Check your inbox</h2>
+    <p class="sub" id="done-text"></p>
+    <p class="alt"><a href="/login">Back to sign in</a></p>
+  </div>
+</main>
+
+<script src="/static/auth.js"></script>
+<script src="/static/page-signup.js"></script>
+</body>
+</html>

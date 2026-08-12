@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PPC Out-of-Budget Dashboard</title>
-<link rel="stylesheet" href="/styles.css">
+<link rel="stylesheet" href="/static/styles.css">
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📉</text></svg>">
 </head>
 <body>
@@ -22,6 +22,10 @@
     <button id="btn-csv" class="ghost" hidden>CSV</button>
     <button id="btn-xlsx" class="ghost" hidden>Excel</button>
     <button id="btn-reset" class="ghost danger" hidden>Start over</button>
+    <!-- Outside the set that stage() toggles, so these stay visible throughout. -->
+    <span id="whoami" class="muted" style="align-self:center;font-size:12px"></span>
+    <a id="link-admin" href="/admin" hidden><button type="button" class="ghost">Accounts</button></a>
+    <button id="btn-signout" class="ghost">Sign out</button>
   </div>
 </header>
 
@@ -40,7 +44,8 @@
       <h2>Drop your change-history exports here</h2>
       <p>One file or a whole week of them. <button type="button" class="linklike" id="pick">Choose files</button>
          &mdash; or drop a folder.</p>
-      <p class="fineprint">Runs entirely on this machine. Nothing is uploaded anywhere.</p>
+      <p class="fineprint">Your files are uploaded to this server, analysed, and deleted
+         when you sign out or go idle. Nobody else using this dashboard can see them.</p>
       <input type="file" id="file-input" multiple accept=".xlsx,.xlsm" hidden>
     </div>
 
@@ -136,10 +141,10 @@
         </div>
       </div>
       <p class="legend">
-        <span><i class="sw" style="background:#16a34a"></i>In budget</span>
-        <span><i class="sw" style="background:#dc2626"></i>Out of budget</span>
-        <span><i class="sw" style="background:#9ca3af"></i>Paused</span>
-        <span><i class="sw" style="background:#e5e7eb"></i>Not yet created</span>
+        <span><i class="sw" style="background:#0f9a74"></i>In budget</span>
+        <span><i class="sw" style="background:#f2542d"></i>Out of budget</span>
+        <span><i class="sw" style="background:#9aa6ad"></i>Paused</span>
+        <span><i class="sw" style="background:#cbdbd4"></i>Not yet created</span>
         <span class="muted">Timeline runs midnight to midnight, left to right.</span>
       </p>
     </div>
@@ -198,6 +203,7 @@
   </form>
 </dialog>
 
-<script src="/app.js"></script>
+<script src="/static/auth.js"></script>
+<script src="/static/app.js"></script>
 </body>
 </html>

@@ -1,0 +1,25 @@
+# Hosted mode only. serve.py and run_report.py need nothing but openpyxl.
+
+# --- web ---
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+python-multipart>=0.0.20      # Starlette needs it to parse multipart uploads
+
+# --- data ---
+sqlalchemy>=2.0.36,<3.0
+pymysql>=1.1.1                # pure-python driver, so the image needs no compiler
+cryptography>=43.0            # PyMySQL needs it for caching_sha2_password (RDS MySQL 8 default)
+
+# --- config / validation ---
+pydantic>=2.9,<3
+pydantic-settings>=2.6,<3     # pulls in python-dotenv
+email-validator>=2.2          # required by pydantic EmailStr
+
+# --- auth ---
+argon2-cffi>=23.1             # not passlib: its last release is 2020 and it breaks on bcrypt>=4.1
+
+# --- outbound ---
+httpx>=0.27                   # multipart POST to EMAIL_ENDPOINT
+
+# --- analysis ---
+openpyxl>=3.1.5
