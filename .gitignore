@@ -1,3 +1,12 @@
+# Node / Vite
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Vercel
+.vercel
+
 # Byte-compiled / cache
 __pycache__/
 *.py[cod]
