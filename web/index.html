@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PPC Out-of-Budget Dashboard</title>
+<link rel="stylesheet" href="/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📉</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark"></span>
+    <div>
+      <h1>Out-of-Budget Dashboard</h1>
+      <p id="subtitle">Amazon Ads change history &rarr; which campaigns keep going dark</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <button id="btn-settings" class="ghost" hidden>Assumptions</button>
+    <button id="btn-csv" class="ghost" hidden>CSV</button>
+    <button id="btn-xlsx" class="ghost" hidden>Excel</button>
+    <button id="btn-reset" class="ghost danger" hidden>Start over</button>
+  </div>
+</header>
+
+<main>
+  <!-- ------------------------------------------------------------ upload -->
+  <section id="stage-upload">
+    <div id="dropzone" class="dropzone" tabindex="0" role="button"
+         aria-label="Drop change-history exports here or click to choose files">
+      <div class="dz-icon" aria-hidden="true">
+        <svg viewBox="0 0 48 48" width="52" height="52" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M24 32V10M14 20l10-10 10 10"/>
+          <path d="M8 30v6a4 4 0 0 0 4 4h24a4 4 0 0 0 4-4v-6"/>
+        </svg>
+      </div>
+      <h2>Drop your change-history exports here</h2>
+      <p>One file or a whole week of them. <button type="button" class="linklike" id="pick">Choose files</button>
+         &mdash; or drop a folder.</p>
+      <p class="fineprint">Runs entirely on this machine. Nothing is uploaded anywhere.</p>
+      <input type="file" id="file-input" multiple accept=".xlsx,.xlsm" hidden>
+    </div>
+
+    <div class="upload-extra">
+      <div class="perf-slot">
+        <div>
+          <h3>Optional: campaign performance report</h3>
+          <p>The change history has no per-campaign spend, so dollar figures cover only the
+             campaigns whose budget was edited that day. Add a performance report with
+             Campaign, Spend, Sales and Budget columns to price every campaign.</p>
+        </div>
+        <button type="button" class="ghost" id="pick-perf">Add report</button>
+        <input type="file" id="perf-input" accept=".xlsx,.xlsm,.csv,.tsv" hidden>
+      </div>
+      <ul id="filelist" class="filelist"></ul>
+      <button id="btn-analyze" class="primary" hidden>Analyse</button>
+    </div>
+  </section>
+
+  <!-- ----------------------------------------------------------- loading -->
+  <section id="stage-loading" hidden>
+    <div class="loading">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loading-text">Reconstructing budget timelines&hellip;</p>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------------- error -->
+  <section id="stage-error" hidden>
+    <div class="callout error">
+      <h2>That did not work</h2>
+      <p id="error-text"></p>
+      <button class="ghost" id="btn-error-back">Back</button>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------------------- dashboard -->
+  <section id="stage-dash" hidden>
+    <div class="answer panel" id="answer">
+      <h2>A typical campaign's day</h2>
+      <p class="lede" id="answer-lede"></p>
+      <div class="daybar" id="daybar"></div>
+      <div class="daykeys" id="daykeys"></div>
+      <p class="sub" id="answer-account"></p>
+    </div>
+
+    <div id="kpis" class="kpis"></div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Starvation through the day</h2>
+          <p class="sub" id="curve-sub"></p>
+        </div>
+      </div>
+      <div id="curve" class="curve"></div>
+    </div>
+
+    <div class="panel" id="reality-panel">
+      <div class="panel-head">
+        <div>
+          <h2>Reality check</h2>
+          <p class="sub">Modelled loss against the spend Amazon actually reported. If these
+             ever approach each other, the model is wrong &mdash; not the account.</p>
+        </div>
+      </div>
+      <div id="reality" class="reality"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2 id="table-title">Campaigns</h2>
+          <p class="sub" id="table-sub"></p>
+        </div>
+        <div class="controls">
+          <div class="segmented" id="grain" hidden role="group" aria-label="Row grain">
+            <button data-mode="campaign" aria-pressed="true">One row per campaign</button>
+            <button data-mode="day" aria-pressed="false">One row per day</button>
+          </div>
+          <input type="search" id="search" placeholder="Filter by campaign name&hellip;"
+                 aria-label="Filter by campaign name">
+          <label class="check"><input type="checkbox" id="only-priced"> Priced only</label>
+          <label class="check"><input type="checkbox" id="only-stale"> No action taken</label>
+        </div>
+      </div>
+      <div id="chips" class="chips"></div>
+      <div class="tablewrap">
+        <div class="thead" id="thead"></div>
+        <div class="tbody" id="tbody" tabindex="0">
+          <div class="spacer" id="spacer"></div>
+          <div class="rows" id="rows"></div>
+        </div>
+      </div>
+      <p class="legend">
+        <span><i class="sw" style="background:#16a34a"></i>In budget</span>
+        <span><i class="sw" style="background:#dc2626"></i>Out of budget</span>
+        <span><i class="sw" style="background:#9ca3af"></i>Paused</span>
+        <span><i class="sw" style="background:#e5e7eb"></i>Not yet created</span>
+        <span class="muted">Timeline runs midnight to midnight, left to right.</span>
+      </p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <div>
+          <h2>Data quality</h2>
+          <p class="sub">Everything that could change how much you trust the numbers above.</p>
+        </div>
+      </div>
+      <div id="quality" class="quality"></div>
+    </div>
+  </section>
+</main>
+
+<!-- --------------------------------------------------------------- drawer -->
+<aside id="drawer" class="drawer" hidden aria-label="Campaign detail">
+  <div class="drawer-head">
+    <div>
+      <h2 id="drawer-title"></h2>
+      <p class="sub" id="drawer-sub"></p>
+    </div>
+    <button class="ghost" id="drawer-close" aria-label="Close">Close</button>
+  </div>
+  <div id="drawer-body"></div>
+</aside>
+<div id="scrim" class="scrim" hidden></div>
+
+<!-- ------------------------------------------------------------- settings -->
+<dialog id="settings">
+  <form method="dialog">
+    <h2>Modelling assumptions</h2>
+    <p class="sub">These affect the money columns only. Timings are measured, not modelled.</p>
+    <label>ROAS
+      <input type="number" id="set-roas" step="0.01" min="0">
+      <small>Blank uses the account average from the export.</small>
+    </label>
+    <label>Marginal haircut
+      <input type="number" id="set-haircut" step="0.05" min="0" max="1">
+      <small>Incremental budget does not convert at the average. 0.7 = 70%.</small>
+    </label>
+    <label>Lost-spend cap
+      <input type="number" id="set-cap" step="0.5" min="1">
+      <small>Multiple of daily budget. Stops a campaign in budget 20 minutes implying
+             an impossible loss.</small>
+    </label>
+    <label>Outage merge gap
+      <input type="number" id="set-gap" step="1" min="0">
+      <small>Minutes in budget below which two outages count as one.</small>
+    </label>
+    <menu>
+      <button value="cancel" class="ghost">Cancel</button>
+      <button value="apply" class="primary" id="set-apply">Re-run</button>
+    </menu>
+  </form>
+</dialog>
+
+<script src="/app.js"></script>
+</body>
+</html>
