@@ -28,13 +28,29 @@ htmlcov/
 
 # OS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
 Thumbs.db
+ehthumbs.db
+Desktop.ini
 
-# Editor
+# Editor / IDE
 .idea/
 .vscode/
+.cursor/
 *.swp
 *~
+*.orig
+*.bak
+*.tmp
+
+# Local launchers (macOS double-click scripts)
+start.command
+*.command
+
+# Logs
+*.log
 
 # Excel lock / temp files
 ~$*.xlsx

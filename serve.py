@@ -49,8 +49,12 @@ class Session:
         self.lock = threading.Lock()
 
     def add(self, name: str, data: bytes, kind: str) -> Path:
+        # One subfolder per upload keeps path.name the user's real filename, so
+        # error messages and the Data Quality sheet never show a "0_" prefix.
         safe = Path(name).name.replace("/", "_") or "upload.xlsx"
-        target = self.dir / f"{len(self.history)}_{safe}"
+        slot = self.dir / f"{len(self.history)}{'p' if kind == 'perf' else ''}"
+        slot.mkdir(parents=True, exist_ok=True)
+        target = slot / safe
         target.write_bytes(data)
         if kind == "perf":
             self.perf = target
@@ -119,8 +123,8 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/state":
             self._json({
-                "history": [p.name.split("_", 1)[-1] for p in SESSION.history],
-                "perf": SESSION.perf.name.split("_", 1)[-1] if SESSION.perf else None,
+                "history": [p.name for p in SESSION.history],
+                "perf": SESSION.perf.name if SESSION.perf else None,
             })
             return
 

@@ -41,15 +41,21 @@ def run_analysis(history: Sequence[Path], perf: Path | None,
         try:
             evs, meta, qa = load_history(path)
         except (ValueError, KeyError, OSError) as exc:
-            skipped.append(f"{path.name}: {exc}")
+            message = str(exc)
+            skipped.append(message if path.name in message
+                           else f"{path.name}: {message}")
             continue
         events.extend(evs)
         metas.append(meta)
         qas.append(qa)
 
     if not events:
-        detail = " ".join(skipped) or "no readable rows"
-        raise ValueError(f"None of the files could be read as a change-history export. {detail}")
+        if skipped:
+            # The per-file reason is the useful part; do not bury it behind a
+            # generic "could not be read".
+            raise ValueError(" ".join(skipped) if len(skipped) == 1
+                             else "No file could be used. " + "  ".join(skipped))
+        raise ValueError("The file has no readable change rows.")
 
     events, overlap_rows = dedupe_events(events)
     days = score_all(events, merge_gap_min=int(settings_in.get("merge_gap", 5)))

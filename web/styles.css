@@ -469,6 +469,17 @@ table.grid th small { display: block; font-size: 9px; font-weight: 500; opacity:
 .axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-3); margin-top: 4px; }
 .drawer h3 { margin: 18px 0 8px; }
 
+/* ------------------------------------------------------------ skipped files */
+
+.skipped-panel { border-left: 4px solid var(--red); }
+.skipped-panel h2 { color: var(--red); }
+#skipped-list { margin-top: 8px; display: grid; gap: 8px; }
+#skipped-list div {
+  background: var(--red-soft); border-radius: 8px; padding: 10px 13px;
+  font-size: 12.5px; color: var(--ink); word-break: break-word;
+}
+#skipped-list b { display: block; margin-bottom: 3px; }
+
 /* ------------------------------------------------------- action log (drawer) */
 
 .act-none, .act-yes {

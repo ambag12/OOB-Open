@@ -556,6 +556,20 @@ def _sheet_quality(wb: Workbook, qas: list[QaReport], days: list[CampaignDay],
         if m.status and m.status != "completed":
             check(f"Extraction status: {qa.path.name[:28]}", False, m.status, "completed",
                   "A partial extraction can be missing whole campaigns, not just rows.")
+        if qa.warning_categories:
+            check(f"Exporter warnings: {qa.path.name[:28]}", False,
+                  ", ".join(f"{n}x {c}" for c, n in qa.warning_categories.items()), "none",
+                  "The export recorded its own failures. PARTIAL_PAGE_HARVEST means it "
+                  "collected fewer rows than the page reported, so changes are missing and "
+                  "every duration here is a lower bound. Re-run the extraction.")
+        if qa.mixed_sources:
+            check(f"Mixed sources: {qa.path.name[:28]}", False,
+                  f"{len(qa.source_urls)} consoles / {len(qa.row_marketplaces)} marketplaces",
+                  "1 / 1",
+                  "This file holds rows from more than one console or marketplace ("
+                  + ", ".join(sorted(qa.row_marketplaces)[:4])
+                  + "). Account spend and ROAS come from one metadata block, so money would be "
+                  "attributed to the wrong marketplace. Export each marketplace separately.")
 
     if len(qas) > 1:
         check("Overlapping exports", True,

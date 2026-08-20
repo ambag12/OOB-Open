@@ -12,6 +12,14 @@ makes it available to a team.
 
 ### The dashboard
 
+Double-click **start.command** in this folder. That is the whole thing — it
+checks Python, installs `openpyxl` if it is missing, picks a free port, starts
+the server and opens your browser. Keep the Terminal window it opens; closing it
+(or Ctrl+C) stops the dashboard. Double-clicking again while it is already
+running just reopens the tab instead of starting a second copy.
+
+From a terminal instead:
+
 ```bash
 python3 serve.py
 ```
@@ -146,6 +154,31 @@ which is precisely backwards. Only the delivery half of that change type
 The window is always the span the data actually covers, never what you asked
 Amazon for. One day of export can only ever say "no action in 1 day".
 
+## When an export is unusable
+
+The tool refuses a file rather than guessing, and says exactly why. The common
+causes, all seen in the wild:
+
+**No timestamps.** If `Date and time` and `Date and time (ISO)` are both empty,
+there is no way to know *when* a campaign went in or out of budget, so hours
+cannot be measured at all. Nothing can be salvaged from that file — re-run the
+extraction. (If only the ISO column is empty, the human-readable one is used
+instead and the file works fine.)
+
+**Exporter warnings.** The export may carry an "Errors and Warnings" sheet.
+`PARTIAL_PAGE_HARVEST` means the extension collected fewer rows than the page
+reported, so changes are missing and every duration becomes a lower bound. That
+is surfaced in Data Quality rather than swallowed.
+
+**Mixed marketplaces.** One file can end up holding rows from two consoles —
+`advertising.amazon.de` and `advertising.amazon.es`, say — if two extraction runs
+were merged. Account spend and ROAS come from a single metadata block, so money
+would be attributed to the wrong marketplace. Export each marketplace separately.
+
+Loading several files at once? Any file that cannot be used is named in a red
+banner at the top of the dashboard with the reason, and the rest are still
+analysed. A dropped file is never silent.
+
 ## The diagnoses
 
 | Label | Means |
@@ -262,11 +295,11 @@ python3 tests/test_golden.py       # the analysis
 python3 tests/test_auth_smoke.py   # the hosted app
 ```
 
-`test_golden.py` is 34 checks: frozen totals from the reference export,
+`test_golden.py` is 38 checks: frozen totals from the reference export,
 structural invariants, overlapping-export handling, action classification, and
 edge cases. The important ones are `test_chain_breaks_canary` and
 `test_amazon_pacing_rows_are_not_actions`. It needs the reference export in
-`data/`; the 15 synthetic-fixture checks run without it.
+`data/`; the synthetic-fixture checks run without it.
 
 `test_auth_smoke.py` is 53 checks covering the whole account lifecycle plus
 upload, analyse and export. It runs against in-memory SQLite with mail captured

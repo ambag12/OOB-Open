@@ -57,6 +57,8 @@ class WorkbookMeta:
     rows_exported: int | None = None
     duplicates_skipped: int | None = None
     pages_processed: int | None = None
+    started_at: str = ""
+    completed_at: str = ""
     spend: float | None = None
     sales: float | None = None
     roas: float | None = None
@@ -73,9 +75,21 @@ class QaReport:
     rows_unparsable_time: int = 0
     rows_no_campaign: int = 0   # account- or portfolio-level rows
     rows_blank: int = 0
+    # Warnings the exporter itself recorded, and provenance of the rows. A file
+    # holding two marketplaces or two extraction runs was stitched together.
+    extraction_warnings: list[str] = field(default_factory=list)
+    warning_categories: dict = field(default_factory=dict)
+    source_urls: list[str] = field(default_factory=list)
+    row_marketplaces: list[str] = field(default_factory=list)
+    row_run_ids: list[str] = field(default_factory=list)
     distinct_campaigns: int = 0
     campaigns_with_budget_events: int = 0
     date_keys: list[str] = field(default_factory=list)
+
+    @property
+    def mixed_sources(self) -> bool:
+        """True when one file holds rows from more than one console or run."""
+        return len(self.source_urls) > 1 or len(self.row_marketplaces) > 1
 
     @property
     def rows_seen(self) -> int:
@@ -116,6 +130,39 @@ class QaReport:
         if gap:
             parts.append(f"{gap:,} UNACCOUNTED")
         return " = ".join([parts[0], " + ".join(parts[1:])])
+
+
+_WHEN_FORMATS = (
+    "%d %b %Y %H:%M:%S.%f", "%d %b %Y %H:%M:%S", "%d %b %Y %H:%M",
+    "%m/%d/%Y %H:%M:%S.%f", "%m/%d/%Y %H:%M:%S", "%m/%d/%Y %H:%M",
+    "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
+)
+
+
+def parse_when(*candidates) -> datetime | None:
+    """First readable timestamp among the given cells.
+
+    The ISO column is preferred, but some exports fill only the human-readable
+    one, so both are tried before a row is written off.
+    """
+    for raw in candidates:
+        if raw is None or raw == "":
+            continue
+        if isinstance(raw, datetime):
+            return raw
+        text = str(raw).strip()
+        if not text or text == "None":
+            continue
+        try:
+            return datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+        for fmt in _WHEN_FORMATS:
+            try:
+                return datetime.strptime(text, fmt)
+            except ValueError:
+                continue
+    return None
 
 
 def _num(value) -> float | None:
@@ -168,6 +215,8 @@ def _read_meta(wb, path: Path) -> WorkbookMeta:
         meta.date_range = str(pairs.get("Date range", "") or "")
         meta.run_id = str(pairs.get("Extraction run ID", "") or "")
         meta.status = str(pairs.get("Status", "") or "")
+        meta.started_at = str(pairs.get("Started at", "") or "")
+        meta.completed_at = str(pairs.get("Completed at", "") or "")
         for attr, key in (
             ("rows_expected", "Rows expected"),
             ("rows_exported", "Rows exported"),
@@ -189,6 +238,37 @@ def _read_meta(wb, path: Path) -> WorkbookMeta:
     return meta
 
 
+def _read_warnings(wb, qa: QaReport) -> None:
+    """The exporter records its own failures on an 'Errors and Warnings' sheet.
+
+    Ignoring it means silently inheriting whatever it could not collect, so the
+    categories and a sample of messages are carried through to Data Quality.
+    """
+    sheet = next((n for n in wb.sheetnames if "error" in n.lower()
+                  or "warning" in n.lower()), None)
+    if sheet is None:
+        return
+    rows = list(wb[sheet].iter_rows(values_only=True))
+    if len(rows) < 2:
+        return
+    header = [str(h).strip().lower() if h else "" for h in rows[0]]
+
+    def idx(name):
+        return header.index(name) if name in header else None
+
+    i_cat, i_msg, i_pg = idx("category"), idx("message"), idx("page number")
+    for row in rows[1:]:
+        if not row or all(v is None for v in row):
+            continue
+        cat = str(row[i_cat]).strip() if i_cat is not None and row[i_cat] else "WARNING"
+        msg = str(row[i_msg]).strip() if i_msg is not None and row[i_msg] else ""
+        page = row[i_pg] if i_pg is not None else None
+        qa.warning_categories[cat] = qa.warning_categories.get(cat, 0) + 1
+        if len(qa.extraction_warnings) < 8:
+            qa.extraction_warnings.append(
+                f"{cat}" + (f" (page {page})" if page else "") + (f": {msg}" if msg else ""))
+
+
 def load_history(path: str | Path) -> tuple[list[Event], WorkbookMeta, QaReport]:
     """Parse one change-history workbook."""
     path = Path(path)
@@ -198,6 +278,7 @@ def load_history(path: str | Path) -> tuple[list[Event], WorkbookMeta, QaReport]
 
     meta = _read_meta(wb, path)
     qa = QaReport(path=path, meta=meta)
+    _read_warnings(wb, qa)
 
     rows = wb["History"].iter_rows(values_only=True)
     header = next(rows, None)
@@ -231,10 +312,8 @@ def load_history(path: str | Path) -> tuple[list[Event], WorkbookMeta, QaReport]
         campaign = str(campaign).strip()
         campaigns.add(campaign)
 
-        iso = cell(row, "Date and time (ISO)")
-        try:
-            when = datetime.fromisoformat(str(iso))
-        except (TypeError, ValueError):
+        when = parse_when(cell(row, "Date and time (ISO)"), cell(row, "Date and time"))
+        if when is None:
             qa.rows_unparsable_time += 1
             continue
 
@@ -247,6 +326,13 @@ def load_history(path: str | Path) -> tuple[list[Event], WorkbookMeta, QaReport]
             in_b = (from_val in BUDGET_STATES, to_val in BUDGET_STATES)
             if in_b[0] != in_b[1]:
                 qa.crossover_violations += 1
+
+        for name, bucket in (("Source URL", qa.source_urls),
+                             ("Marketplace", qa.row_marketplaces),
+                             ("Run ID", qa.row_run_ids)):
+            v = cell(row, name)
+            if v and str(v).strip() not in bucket:
+                bucket.append(str(v).strip())
 
         date_key = when.date().isoformat()
         dates.add(date_key)
@@ -269,6 +355,29 @@ def load_history(path: str | Path) -> tuple[list[Event], WorkbookMeta, QaReport]
         )
 
     wb.close()
+
+    # No timestamps means no timeline, and no timeline means out-of-budget hours
+    # cannot be measured at all. Say exactly that, plus whatever the exporter
+    # already admitted, instead of a generic "could not be read".
+    if not events and qa.rows_unparsable_time:
+        detail = [
+            f"{path.name}: none of the {qa.rows_unparsable_time:,} rows have a usable "
+            "timestamp — 'Date and time' and 'Date and time (ISO)' are both empty. "
+            "Without a time on each change there is no way to reconstruct when a "
+            "campaign was in or out of budget, so hours cannot be measured."
+        ]
+        if qa.warning_categories:
+            worst = ", ".join(f"{n}x {c}" for c, n in qa.warning_categories.items())
+            detail.append(f"The export also recorded its own problems ({worst}), "
+                          "so rows are missing as well.")
+        if not qa.row_accounting_ok and meta.rows_expected:
+            detail.append(f"Its row counts do not reconcile either: "
+                          f"{meta.rows_expected:,} expected - "
+                          f"{meta.duplicates_skipped:,} duplicates != "
+                          f"{meta.rows_exported:,} exported.")
+        detail.append("Re-run the extraction in the Amazon Ads console and let it "
+                      "finish before downloading.")
+        raise ValueError(" ".join(detail))
 
     qa.rows_parsed = len(events) + qa.rows_unparsable_time
     qa.distinct_campaigns = len(campaigns)

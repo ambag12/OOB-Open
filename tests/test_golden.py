@@ -137,6 +137,39 @@ def test_row_accounting_explains_unscoreable_rows():
     assert "UNACCOUNTED" in broken.accounting_detail
 
 
+# ------------------------------------------------------ broken exports
+
+def test_human_readable_timestamp_is_a_valid_fallback():
+    """Some extractions fill only 'Date and time', not the ISO column."""
+    from ppcbudget.ingest import parse_when
+    from datetime import datetime
+    assert parse_when(None, "5 Aug 2026 23:59") == datetime(2026, 8, 5, 23, 59)
+    assert parse_when("", "5 Aug 2026 14:17:18.440").hour == 14
+    assert parse_when("2026-08-05T14:17:18", "ignored").minute == 17
+    assert parse_when("2026-08-05T14:17:18Z") is not None
+    # The ISO column wins when both are present and disagree.
+    assert parse_when("2026-08-05T01:00:00", "5 Aug 2026 23:59").hour == 1
+
+
+def test_no_timestamp_anywhere_is_unusable_and_says_why():
+    """A timeline needs a time on every row. Failing quietly would be worse."""
+    from ppcbudget.ingest import parse_when
+    assert parse_when(None, None) is None
+    assert parse_when("", "") is None
+    assert parse_when("None", "not a date") is None
+
+
+def test_exporter_warnings_are_never_ignored():
+    """The reference file is clean, but the reader must expose the fields the
+    Data Quality panel relies on."""
+    qa = load()["qa"]
+    assert qa.warning_categories == {}
+    assert qa.extraction_warnings == []
+    assert not qa.mixed_sources
+    assert len(qa.source_urls) == 1, "one export should come from one console"
+    assert len(qa.row_marketplaces) == 1
+
+
 # ------------------------------------------------------- last meaningful action
 
 def test_amazon_pacing_rows_are_not_actions():

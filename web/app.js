@@ -133,6 +133,16 @@ function render() {
     row.unt = row.act.unt;
   }
 
+  // A file that could not be read must never disappear quietly.
+  const skipped = d.skipped || [];
+  $('skipped').hidden = skipped.length === 0;
+  $('skipped-list').innerHTML = skipped.map((line) => {
+    const cut = line.indexOf(': ');
+    const name = cut > 0 ? line.slice(0, cut) : 'A file';
+    const why = cut > 0 ? line.slice(cut + 2) : line;
+    return `<div><b>${escapeHtml(name)}</b>${escapeHtml(why)}</div>`;
+  }).join('');
+
   $('grain').hidden = t.days < 2;
   renderAnswer(t, m);
   renderKpis(t, m);

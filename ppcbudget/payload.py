@@ -106,6 +106,24 @@ def _quality(qas: list[QaReport], days: list[CampaignDay], totals: Totals,
         if m.status and m.status != "completed":
             add(f"Extraction status - {qa.path.name}", False, m.status,
                 "A partial extraction can be missing whole campaigns, not just rows.")
+        if qa.warning_categories:
+            worst = ", ".join(f"{n}x {c}" for c, n in qa.warning_categories.items())
+            add(f"Exporter warnings - {qa.path.name}", False, worst,
+                "The export recorded its own failures on an 'Errors and Warnings' sheet. "
+                "PARTIAL_PAGE_HARVEST means it collected fewer rows than the page reported, so "
+                "changes are missing and every duration here is a lower bound. Re-run the "
+                "extraction and let it finish. Sample: "
+                + " | ".join(qa.extraction_warnings[:3]))
+
+        if qa.mixed_sources:
+            add(f"Mixed sources - {qa.path.name}", False,
+                f"{len(qa.source_urls)} consoles, {len(qa.row_marketplaces)} marketplaces",
+                "This one file holds rows from more than one Amazon console or marketplace: "
+                + ", ".join(sorted(qa.row_marketplaces)[:4])
+                + ". Account-level spend and ROAS come from a single metadata block, so the "
+                "money figures would be attributed to the wrong marketplace. Export each "
+                "marketplace separately.")
+
         if qa.crossover_violations:
             add("State machines crossed", False, qa.crossover_violations,
                 "A 'Campaign status' row mixed budget and delivery vocabularies, so splitting "
