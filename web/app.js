@@ -823,7 +823,13 @@ $('settings').addEventListener('close', (ev) => {
 // expired session redirects to the sign-in page rather than silently rendering
 // an empty dashboard.
 A.api('/api/state').then((r) => r.json()).then((s) => {
-  if (s.user) {
+  if (s.mode === 'local') {
+    const note = $('upload-note');
+    if (note) {
+      note.textContent = 'Everything stays on this machine. Nothing is uploaded anywhere.';
+    }
+  } else if (s.user) {
+    $('btn-signout').hidden = false;
     $('whoami').textContent = s.user.name || s.user.email;
     $('whoami').title = s.user.email;
     $('link-admin').hidden = !s.user.is_admin;

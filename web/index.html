@@ -25,7 +25,7 @@
     <!-- Outside the set that stage() toggles, so these stay visible throughout. -->
     <span id="whoami" class="muted" style="align-self:center;font-size:12px"></span>
     <a id="link-admin" href="/admin" hidden><button type="button" class="ghost">Accounts</button></a>
-    <button id="btn-signout" class="ghost">Sign out</button>
+    <button id="btn-signout" class="ghost" hidden>Sign out</button>
   </div>
 </header>
 
@@ -44,7 +44,7 @@
       <h2>Drop your change-history exports here</h2>
       <p>One file or a whole week of them. <button type="button" class="linklike" id="pick">Choose files</button>
          &mdash; or drop a folder.</p>
-      <p class="fineprint">Your files are uploaded to this server, analysed, and deleted
+      <p class="fineprint" id="upload-note">Your files are uploaded to this server, analysed, and deleted
          when you sign out or go idle. Nobody else using this dashboard can see them.</p>
       <input type="file" id="file-input" multiple accept=".xlsx,.xlsm" hidden>
     </div>

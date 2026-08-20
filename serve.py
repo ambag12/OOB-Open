@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import shutil
 import tempfile
 import threading
@@ -35,7 +36,75 @@ MAX_UPLOAD = 200 * 1024 * 1024
 
 MIME = {".html": "text/html; charset=utf-8", ".css": "text/css; charset=utf-8",
         ".js": "text/javascript; charset=utf-8", ".svg": "image/svg+xml",
-        ".ico": "image/x-icon"}
+        ".ico": "image/x-icon", ".woff2": "font/woff2"}
+
+
+def _web_file(url_path: str) -> Path | None:
+    """Map a URL path to a file under web/, mirroring the hosted /static mount."""
+    rel = url_path.removeprefix("/static/").lstrip("/")
+    if url_path in ("/", ""):
+        rel = "index.html"
+    target = (WEB / rel).resolve()
+    if not str(target).startswith(str(WEB.resolve())) or not target.is_file():
+        return None
+    return target
+
+
+_DISPOSITION = re.compile(
+    r'content-disposition:\s*form-data;\s*(.*)',
+    re.IGNORECASE,
+)
+_FIELD = re.compile(r'name="([^"]+)"')
+_FILENAME = re.compile(r'filename="([^"]*)"')
+
+
+def _parse_multipart(body: bytes, content_type: str) -> tuple[str, bytes, str]:
+    """Extract (filename, file_bytes, kind) from a multipart upload."""
+    if "multipart/form-data" not in content_type:
+        raise ValueError("Expected a multipart upload.")
+    boundary = None
+    for part in content_type.split(";"):
+        part = part.strip()
+        if part.startswith("boundary="):
+            boundary = part[9:].strip().strip('"')
+            break
+    if not boundary:
+        raise ValueError("Upload is missing a boundary.")
+
+    filename = "upload.xlsx"
+    kind = "history"
+    file_data = b""
+    for section in body.split(f"--{boundary}".encode()):
+        if not section or section in (b"--", b"--\r\n"):
+            continue
+        chunk = section.lstrip(b"\r\n")
+        if not chunk:
+            continue
+        header_end = chunk.find(b"\r\n\r\n")
+        if header_end < 0:
+            continue
+        headers = chunk[:header_end].decode("latin-1", errors="replace")
+        payload = chunk[header_end + 4:]
+        if payload.endswith(b"\r\n"):
+            payload = payload[:-2]
+
+        disp = _DISPOSITION.search(headers)
+        if not disp:
+            continue
+        name_match = _FIELD.search(disp.group(1))
+        if not name_match:
+            continue
+        name = name_match.group(1)
+        if name == "kind":
+            kind = payload.decode("utf-8", errors="replace").strip() or "history"
+        elif name == "file":
+            file_data = payload
+            fn = _FILENAME.search(disp.group(1))
+            if fn and fn.group(1):
+                filename = fn.group(1)
+    if not file_data:
+        raise ValueError("That file was empty.")
+    return filename, file_data, kind
 
 
 class Session:
@@ -123,6 +192,7 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/state":
             self._json({
+                "mode": "local",
                 "history": [p.name for p in SESSION.history],
                 "perf": SESSION.perf.name if SESSION.perf else None,
             })
@@ -132,9 +202,8 @@ class Handler(BaseHTTPRequestHandler):
             self._export(parse_qs(route.query).get("format", ["xlsx"])[0])
             return
 
-        rel = "index.html" if path in ("/", "") else path.lstrip("/")
-        target = (WEB / rel).resolve()
-        if not str(target).startswith(str(WEB.resolve())) or not target.is_file():
+        target = _web_file(path)
+        if target is None:
             self._send(HTTPStatus.NOT_FOUND, b"Not found", "text/plain; charset=utf-8")
             return
         self._send(HTTPStatus.OK, target.read_bytes(),
@@ -144,12 +213,16 @@ class Handler(BaseHTTPRequestHandler):
         path = urlparse(self.path).path
         try:
             if path == "/api/upload":
-                name = self.headers.get("X-Filename", "upload.xlsx")
-                kind = self.headers.get("X-Kind", "history")
-                data = self._body()
-                if not data:
-                    self._error("That file was empty.")
-                    return
+                ctype = self.headers.get("Content-Type", "")
+                if "multipart/form-data" in ctype:
+                    name, data, kind = _parse_multipart(self._body(), ctype)
+                else:
+                    name = self.headers.get("X-Filename", "upload.xlsx")
+                    kind = self.headers.get("X-Kind", "history")
+                    data = self._body()
+                    if not data:
+                        self._error("That file was empty.")
+                        return
                 with SESSION.lock:
                     SESSION.add(name, data, kind)
                 self._json({"ok": True, "name": Path(name).name})
