@@ -21,6 +21,24 @@ export const CT_CAMPAIGN_CREATED = 'Campaign created';
 // Budget rule cells read "Budget: $20.00 - Rule(s) active" with an en-dash.
 const MONEY_RE = /\$\s*([\d,]+(?:\.\d+)?)/;
 
+const ISO_COLUMN = 'Date and time (ISO)';
+
+const TIME_FALLBACKS = [
+  'date and time',
+  'date & time',
+  'date/time',
+  'datetime',
+  'timestamp',
+  'date and time (utc)',
+  'date and time (local)',
+  'changed at',
+  'date',
+];
+
+const TIME_OF_DAY_COLUMNS = ['time', 'time of day'];
+
+const normalize = (s: string) => s.trim().toLowerCase().replace(/\s+/g, ' ');
+
 export type Machine =
   | 'budget'
   | 'delivery'
@@ -74,6 +92,17 @@ export interface QaReport {
   distinctCampaigns: number;
   campaignsWithBudgetEvents: number;
   dateKeys: string[];
+  /** Column titles as they appear in the sheet, for diagnosing a bad file. */
+  headers: string[];
+  /** The first timestamp we could not read, quoted back to the user verbatim. */
+  sampleBadTime: string | null;
+  /** Which column each row's timestamp actually came from. */
+  timeSourceCounts: Record<string, number>;
+}
+
+/** Columns other than the ISO one that ended up supplying timestamps. */
+export function fallbackTimeSources(qa: QaReport): [column: string, rows: number][] {
+  return Object.entries(qa.timeSourceCounts).filter(([name]) => name !== ISO_COLUMN);
 }
 
 function emptyMeta(fileName: string): WorkbookMeta {
@@ -141,6 +170,57 @@ export function accountingDetail(qa: QaReport): string {
   return [parts[0], parts.slice(1).join(' + ')].join(' = ');
 }
 
+/**
+ * Why a file that parsed cleanly still yielded nothing to score.
+ *
+ * "No readable rows" is true but useless. Every row we drop is dropped for a
+ * specific, nameable reason, and the file is on the reader's own machine -- so
+ * say which reason it was and quote the offending value back to them.
+ */
+export function explainNoEvents(qa: QaReport): string {
+  const total = rowsSeen(qa);
+  if (total === 0) {
+    return (
+      `${qa.fileName}: the History sheet has a header row but no data rows ` +
+      `beneath it. Columns found: ${qa.headers.join(', ') || '(none)'}.`
+    );
+  }
+
+  const parts: string[] = [];
+  if (qa.rowsUnparsableTime) {
+    const sample =
+      qa.sampleBadTime === null
+        ? ''
+        : ` — the first one reads "${qa.sampleBadTime}", which is not an ISO timestamp ` +
+          '(expected something like 2026-08-05T14:23:00)';
+    parts.push(
+      `${int(qa.rowsUnparsableTime)} had an unreadable "Date and time (ISO)" value${sample}`,
+    );
+  }
+  if (qa.rowsNoCampaign) parts.push(`${int(qa.rowsNoCampaign)} had an empty Campaign cell`);
+  if (qa.rowsBlank) parts.push(`${int(qa.rowsBlank)} were blank`);
+
+  const why = parts.length
+    ? parts.join('; ')
+    : 'none of them carried a campaign that could be placed on a timeline';
+  // The column list is the useful part when the timestamps are missing: it
+  // shows at a glance whether the instant is sitting in some other column.
+  let columns = '';
+  if (qa.rowsUnparsableTime) {
+    const tried = qa.headers.filter(
+      (h) => h !== ISO_COLUMN && TIME_FALLBACKS.includes(normalize(h)),
+    );
+    columns = tried.length
+      ? ` The other date column${tried.length > 1 ? 's' : ''} in this sheet ` +
+        `(${tried.join(', ')}) could not be read either — dates must be ISO, ` +
+        'like 2026-08-05T14:23:00, because "08/05/2026" means August 5th to some ' +
+        'tools and May 8th to others.'
+      : ' No other column in this sheet holds a date.';
+    columns += ` Columns found: ${qa.headers.join(', ') || '(none)'}.`;
+  }
+  return `${qa.fileName}: ${int(total)} data rows, and ${why}.${columns}`;
+}
+
 // --------------------------------------------------------------------- values
 
 /** Python's `float(str(v).replace(",","").replace("$","").strip())`, softened. */
@@ -193,7 +273,19 @@ export interface Stamp {
  * are the account's local wall clock, and Python's `datetime.fromisoformat`
  * followed by `.date()`/`.hour` reads the same naive fields.
  */
-export function parseStamp(value: unknown): Stamp | null {
+export function parseStamp(value: unknown, timeOfDay?: unknown): Stamp | null {
+  const stamp = parseDatePart(value);
+  if (!stamp) return null;
+  // A separate Time column only applies when the date carries no clock of its
+  // own -- an Excel date-only serial, or a bare `2026-08-05`.
+  if (timeOfDay !== undefined && stamp.second === 0) {
+    const seconds = parseTimeOfDay(timeOfDay);
+    if (seconds !== null) return { ...stamp, minute: Math.floor(seconds / 60), second: seconds };
+  }
+  return stamp;
+}
+
+function parseDatePart(value: unknown): Stamp | null {
   if (value === null || value === undefined || value === '') return null;
 
   if (value instanceof Date) {
@@ -220,10 +312,32 @@ export function parseStamp(value: unknown): Stamp | null {
     return fields(d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate(), secOfDay);
   }
 
+  // Deliberately ISO-only. `08/05/2026` is the 8th of May to half the world
+  // and the 5th of August to the other half, and guessing wrong would move
+  // every outage in the report without anyone noticing.
   const m = ISO_RE.exec(String(value).trim());
   if (!m) return null;
   const secOfDay = Number(m[4] ?? 0) * 3600 + Number(m[5] ?? 0) * 60 + Number(m[6] ?? 0);
   return fields(Number(m[1]), Number(m[2]), Number(m[3]), secOfDay);
+}
+
+const TIME_RE = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/;
+
+/** Seconds past midnight, from an Excel time fraction or an `HH:MM[:SS]` string. */
+export function parseTimeOfDay(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (value instanceof Date) {
+    return value.getHours() * 3600 + value.getMinutes() * 60 + value.getSeconds();
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) return null;
+    const frac = value - Math.floor(value);
+    return Math.min(86399, Math.round(frac * 86400));
+  }
+  const m = TIME_RE.exec(String(value).trim());
+  if (!m) return null;
+  const seconds = Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3] ?? 0);
+  return seconds < 86400 ? seconds : null;
 }
 
 function fields(year: number, month: number, day: number, secOfDay: number): Stamp {
@@ -297,11 +411,24 @@ export interface HistoryFile {
 
 const REQUIRED = ['Campaign', 'Change type', 'From', 'To', 'Date and time (ISO)'];
 
+/**
+ * Where else the timestamp might live, best first.
+ *
+ * The ISO column is the one the extractor is supposed to fill, and normally
+ * does. When it comes through empty the row is not necessarily lost -- the
+ * same instant is often sitting in a plainer column beside it, and reading
+ * that is far better than discarding the whole export. Which column actually
+ * supplied the timestamps is reported in Data Quality, never assumed silently.
+ */
+
 /** Parse one change-history workbook. */
 export function loadHistory(fileName: string, data: ArrayBuffer): HistoryFile {
   const wb = XLSX.read(data, { type: 'array', dense: true, cellDates: false });
   if (!wb.SheetNames.includes('History')) {
-    throw new Error(`${fileName}: no 'History' sheet -- is this a change-history export?`);
+    throw new Error(
+      `${fileName}: no 'History' sheet — is this a change-history export? ` +
+        `This workbook contains: ${wb.SheetNames.join(', ') || '(no sheets)'}.`,
+    );
   }
 
   const meta = readMeta(wb, fileName);
@@ -317,6 +444,9 @@ export function loadHistory(fileName: string, data: ArrayBuffer): HistoryFile {
     distinctCampaigns: 0,
     campaignsWithBudgetEvents: 0,
     dateKeys: [],
+    headers: [],
+    sampleBadTime: null,
+    timeSourceCounts: {},
   };
 
   const rows = sheetRows(wb, 'History');
@@ -328,16 +458,30 @@ export function loadHistory(fileName: string, data: ArrayBuffer): HistoryFile {
     if (name !== null && name !== undefined && name !== '') col.set(text(name), i);
   });
   qa.columns = header.length;
+  qa.headers = [...col.keys()];
 
   const missing = REQUIRED.filter((c) => !col.has(c));
   if (missing.length) {
-    throw new Error(`${fileName}: missing expected column(s): ${missing.join(', ')}`);
+    throw new Error(
+      `${fileName}: the History sheet is missing expected column(s): ${missing.join(', ')}. ` +
+        `Its columns are: ${qa.headers.join(', ') || '(none)'}.`,
+    );
   }
 
   const cell = (row: Row, name: string): unknown => {
     const i = col.get(name);
     return i !== undefined && i < row.length ? row[i] : null;
   };
+  const at = (row: Row, i: number): unknown => (i < row.length ? row[i] : null);
+
+  // Candidate timestamp columns, ISO first, then whatever else this sheet has.
+  const byNormalized = new Map([...col].map(([name, i]) => [normalize(name), { name, i }]));
+  const timeColumns = [{ name: ISO_COLUMN, i: col.get(ISO_COLUMN)! }];
+  for (const candidate of TIME_FALLBACKS) {
+    const found = byNormalized.get(candidate);
+    if (found && found.name !== ISO_COLUMN) timeColumns.push(found);
+  }
+  const timeOfDay = TIME_OF_DAY_COLUMNS.map((c) => byNormalized.get(c)).find(Boolean) ?? null;
 
   const events: Event[] = [];
   const campaigns = new Set<string>();
@@ -360,11 +504,28 @@ export function loadHistory(fileName: string, data: ArrayBuffer): HistoryFile {
     const campaign = String(rawCampaign).trim();
     campaigns.add(campaign);
 
-    const when = parseStamp(cell(row, 'Date and time (ISO)'));
+    const clock = timeOfDay ? at(row, timeOfDay.i) : undefined;
+    let when: Stamp | null = null;
+    let source = ISO_COLUMN;
+    for (const candidate of timeColumns) {
+      when = parseStamp(at(row, candidate.i), clock);
+      if (when) {
+        source = candidate.name;
+        break;
+      }
+    }
     if (!when) {
       qa.rowsUnparsableTime += 1;
+      if (qa.sampleBadTime === null) {
+        const raw = cell(row, ISO_COLUMN);
+        qa.sampleBadTime =
+          raw === null || raw === undefined || raw === ''
+            ? '(empty)'
+            : String(raw).slice(0, 60);
+      }
       continue;
     }
+    qa.timeSourceCounts[source] = (qa.timeSourceCounts[source] ?? 0) + 1;
 
     const fromRaw = cell(row, 'From');
     const toRaw = cell(row, 'To');

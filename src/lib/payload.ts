@@ -10,7 +10,7 @@ import { summary as actionSummaryText, untouched } from './actions';
 import type { ActionSummary, CampaignActions, RecentAction } from './actions';
 import { trendLabel } from './aggregate';
 import type { CampaignRollup } from './aggregate';
-import { accountingDetail, rowAccountingOk } from './ingest';
+import { accountingDetail, fallbackTimeSources, rowAccountingOk } from './ingest';
 import type { QaReport, WorkbookMeta } from './ingest';
 import { hourlyStarvation } from './metrics';
 import type { ModelSettings, Totals } from './metrics';
@@ -271,6 +271,18 @@ function quality(
         false,
         m.status,
         'A partial extraction can be missing whole campaigns, not just rows.',
+      );
+    }
+    const fallbacks = fallbackTimeSources(qa);
+    if (fallbacks.length) {
+      add(
+        `Timestamp column - ${qa.fileName}`,
+        null,
+        fallbacks.map(([name, n]) => `${int(n)} from "${name}"`).join(', '),
+        'The "Date and time (ISO)" column was empty on those rows, so the instant was read ' +
+          'from another column in the same row instead of throwing the row away. Every ' +
+          'timing in this report rests on it, so confirm that column is the one you expect ' +
+          '— and that its clock matches the ISO column on the rows that had both.',
       );
     }
     if (qa.crossoverViolations) {

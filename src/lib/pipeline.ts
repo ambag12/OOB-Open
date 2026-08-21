@@ -9,7 +9,7 @@ import { build as buildActions, summarizeActions } from './actions';
 import type { CampaignActions } from './actions';
 import { rollup } from './aggregate';
 import type { CampaignRollup } from './aggregate';
-import { dedupeEvents, loadHistory } from './ingest';
+import { dedupeEvents, explainNoEvents, loadHistory } from './ingest';
 import type { Event, QaReport, WorkbookMeta } from './ingest';
 import {
   DEFAULT_CAP_MULTIPLE,
@@ -90,14 +90,18 @@ export function analyze(
       metas.push(parsed.meta);
       qas.push(parsed.qa);
     } catch (exc) {
-      skipped.push(`${file.name}: ${exc instanceof Error ? exc.message : String(exc)}`);
+      // The reader names the file in its own errors; anything else might not.
+      const message = exc instanceof Error ? exc.message : String(exc);
+      skipped.push(message.startsWith(file.name) ? message : `${file.name}: ${message}`);
     }
   }
 
   if (!events.length) {
-    const detail = skipped.join(' ') || 'no readable rows';
+    // Say which rows were dropped and why, per file. "No readable rows" is
+    // true but leaves the reader with nowhere to go.
+    const detail = [...skipped, ...qas.map(explainNoEvents)].join(' ');
     throw new Error(
-      `None of the files could be read as a change-history export. ${detail}`,
+      `None of the files could be read as a change-history export. ${detail}`.trim(),
     );
   }
 
