@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Accounts &middot; Out-of-Budget Dashboard</title>
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📉</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark"></span>
+    <div>
+      <h1>Accounts</h1>
+      <p>Who can sign in to this dashboard</p>
+    </div>
+  </div>
+  <div class="topbar-actions">
+    <a href="/"><button type="button" class="ghost">Dashboard</button></a>
+    <button type="button" class="ghost danger" id="signout">Sign out</button>
+  </div>
+</header>
+
+<main class="admin">
+  <div class="panel">
+    <div class="panel-head">
+      <div>
+        <h2>Accounts</h2>
+        <p class="sub" id="summary">Loading&hellip;</p>
+      </div>
+    </div>
+    <p id="note" class="msg" hidden></p>
+    <div style="overflow-x:auto">
+      <table class="utable">
+        <thead>
+          <tr>
+            <th>Email</th><th>Name</th><th>Status</th><th>Role</th>
+            <th>Last signed in</th><th></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+  </div>
+</main>
+
+<script src="/static/auth.js"></script>
+<script src="/static/page-admin.js"></script>
+</body>
+</html>

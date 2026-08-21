@@ -1,39 +1,86 @@
+/* ============================================================================
+   Utopia Brands identity.
+
+   Brand swatches are held verbatim in the --u-* tokens and never altered;
+   everything else is derived from them. Two colours are NOT in the brand guide:
+   --red and --amber. The guide covers identity, not function, and it has no
+   warning colour -- but this dashboard exists to show campaigns going dark, so
+   "out of budget" has to read as a problem. They are tuned to sit against the
+   brand greens and are used only to encode state, never as decoration.
+   ========================================================================== */
+
+/* Belleza carries the headings, per the guide's typeface hierarchy. Drop
+   Belleza-Regular.woff2 into web/fonts/ and it takes over; until then the
+   fallbacks below are the nearest humanist faces already on most machines.
+   Fonts must be self-hosted -- the Content-Security-Policy blocks every
+   external host, so a Google Fonts <link> would silently fail. */
+@font-face {
+  font-family: 'Belleza';
+  src: url('/static/fonts/Belleza-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Body copy is Neue Montreal in the guide. It is a commercial licence, so the
+   stack falls through to the closest grotesques until the files are added:
+     @font-face { font-family:'Neue Montreal';
+                  src:url('/static/fonts/NeueMontreal-Regular.woff2') format('woff2');
+                  font-weight:400; font-display:swap; }
+   Add that block plus the Medium/Bold cuts and the whole app picks it up. */
+
 :root {
-  --bg: #f6f7f9;
+  /* ---- brand, exactly as published ---- */
+  --u-deep: #004d43;   /* primary   deep green */
+  --u-lime: #ceff71;   /* primary   lime */
+  --u-ink:  #1a3134;   /* primary   near-black teal */
+  --u-mist: #eafff4;   /* primary   pale mint */
+  --u-mint: #25e9a5;   /* secondary mint */
+  --u-peri: #8e92ff;   /* secondary periwinkle */
+
+  --font-display: 'Belleza', Optima, Candara, 'Gill Sans MT', 'Trebuchet MS', sans-serif;
+  --font-body: 'Neue Montreal', -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, sans-serif;
+
+  /* ---- light mode ---- */
+  --bg: var(--u-mist);
   --panel: #ffffff;
-  --ink: #16202e;
-  --ink-2: #55637a;
-  --ink-3: #8b97ab;
-  --line: #e3e7ee;
-  --line-2: #eef1f6;
-  --navy: #1f3864;
-  --accent: #2563eb;
-  --green: #16a34a;
-  --amber: #b45309;
-  --red: #dc2626;
-  --red-soft: #fee2e2;
-  --amber-soft: #fef3c7;
-  --green-soft: #dcfce7;
-  --shadow: 0 1px 2px rgba(16,32,46,.06), 0 8px 24px rgba(16,32,46,.06);
+  --ink: var(--u-ink);
+  --ink-2: #4a6b64;
+  --ink-3: #7c9a92;
+  --line: #cfe8dc;
+  --line-2: #e4f5ec;
+  --brand: #004d43;
+  --accent: #5a5fd6;        /* periwinkle, darkened to hold up as link text */
+  --green: #0f7a5c;
+  --amber: #a2600a;
+  --red: #c9401f;
+  --red-soft: #ffe4dc;
+  --amber-soft: #fdefd0;
+  --green-soft: #d3f6e8;
+  --shadow: 0 1px 2px rgba(0,77,67,.07), 0 8px 24px rgba(0,77,67,.07);
   --radius: 12px;
   --row-h: 34px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1419;
-    --panel: #171d26;
-    --ink: #e6ebf2;
-    --ink-2: #9aa7ba;
-    --ink-3: #6b7789;
-    --line: #263040;
-    --line-2: #1e2734;
-    --navy: #7aa2e8;
-    --accent: #60a5fa;
-    --red-soft: #3b1d1d;
-    --amber-soft: #3a2e12;
-    --green-soft: #12301f;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    --bg: #14282a;
+    --panel: var(--u-ink);
+    --ink: var(--u-mist);
+    --ink-2: #a4c6bc;
+    --ink-3: #789c93;
+    --line: #2c4a4a;
+    --line-2: #21393a;
+    /* Lime with dark text is the brand's own call-to-action treatment. */
+    --brand: var(--u-lime);
+    --accent: var(--u-peri);
+    --green: var(--u-mint);
+    --amber: #f0b429;
+    --red: #ff7a5c;
+    --red-soft: #40201a;
+    --amber-soft: #3d2f10;
+    --green-soft: #0f3a2c;
+    --shadow: 0 1px 2px rgba(0,0,0,.45), 0 8px 24px rgba(0,0,0,.35);
   }
 }
 
@@ -43,13 +90,17 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  font: 14px/1.5 var(--font-body);
   -webkit-font-smoothing: antialiased;
 }
 
+/* Headings in Belleza, body and sub-headings in the body face -- the hierarchy
+   set out in the brand guide. Belleza runs small and light for its size, so it
+   is stepped up slightly and given back the letter-spacing a display face wants. */
 h1, h2, h3 { margin: 0; font-weight: 650; letter-spacing: -.01em; }
-h1 { font-size: 17px; }
-h2 { font-size: 15px; }
+h1, h2 { font-family: var(--font-display); font-weight: 400; letter-spacing: 0; }
+h1 { font-size: 19px; }
+h2 { font-size: 17px; }
 h3 { font-size: 13px; }
 p { margin: 0; }
 .sub { color: var(--ink-2); font-size: 12.5px; max-width: 78ch; }
@@ -67,9 +118,15 @@ p { margin: 0; }
   border-bottom: 1px solid var(--line);
 }
 .brand { display: flex; align-items: center; gap: 12px; }
+/* Placeholder for the Utopia emblem: the brand's two primaries, split on the
+   same diagonal the guide's livery uses. Swap for the real mark when the SVG
+   lands -- redrawing a registered emblem by hand is one of the guide's don'ts. */
 .mark {
   width: 30px; height: 30px; border-radius: 8px; flex: none;
-  background: linear-gradient(135deg, var(--green) 0%, var(--green) 32%, var(--red) 32%, var(--red) 100%);
+  background: linear-gradient(135deg, var(--u-deep) 0 32%, var(--u-lime) 32% 100%);
+}
+@media (prefers-color-scheme: dark) {
+  .mark { background: linear-gradient(135deg, var(--u-mint) 0 32%, var(--u-lime) 32% 100%); }
 }
 .brand p { font-size: 12px; color: var(--ink-2); }
 .topbar-actions { display: flex; gap: 8px; }
@@ -84,8 +141,8 @@ button {
 button:hover { border-color: var(--ink-3); }
 button:active { transform: translateY(1px); }
 button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.primary { background: var(--navy); border-color: var(--navy); color: #fff; font-weight: 600; }
-@media (prefers-color-scheme: dark) { .primary { color: #0f1419; } }
+.primary { background: var(--brand); border-color: var(--brand); color: #fff; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .primary { color: var(--u-ink); } }
 .primary:hover { filter: brightness(1.08); }
 .ghost { background: transparent; }
 .danger:hover { border-color: var(--red); color: var(--red); }
@@ -133,7 +190,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .loading { text-align: center; padding: 90px 20px; color: var(--ink-2); }
 .spinner {
   width: 30px; height: 30px; margin: 0 auto 16px; border-radius: 50%;
-  border: 3px solid var(--line); border-top-color: var(--navy);
+  border: 3px solid var(--line); border-top-color: var(--brand);
   animation: spin .8s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -163,6 +220,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   font-size: 12px; font-weight: 650; color: #fff; white-space: nowrap; overflow: hidden;
   text-shadow: 0 1px 2px rgba(0,0,0,.3);
 }
+/* Paused and not-yet-created are pale by design, so white would vanish. */
+.daybar span.on-pale { color: var(--u-ink); text-shadow: none; }
 .daykeys { display: flex; flex-wrap: wrap; gap: 20px; margin-top: 11px; font-size: 12.5px; }
 .daykeys div { display: flex; align-items: center; gap: 7px; color: var(--ink-2); }
 .daykeys b { color: var(--ink); font-variant-numeric: tabular-nums; }
@@ -186,7 +245,7 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 .kpi .value {
   font-size: 27px; font-weight: 680; letter-spacing: -.02em;
-  margin: 5px 0 3px; font-variant-numeric: tabular-nums; color: var(--navy);
+  margin: 5px 0 3px; font-variant-numeric: tabular-nums; color: var(--brand);
 }
 .kpi .note { font-size: 11.5px; color: var(--ink-3); }
 .kpi.alarm .value { color: var(--red); }
@@ -215,8 +274,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   background: transparent; color: var(--ink-2);
 }
 .segmented button + button { border-left: 1px solid var(--line); }
-.segmented button[aria-pressed="true"] { background: var(--navy); color: #fff; font-weight: 600; }
-@media (prefers-color-scheme: dark) { .segmented button[aria-pressed="true"] { color: #0f1419; } }
+.segmented button[aria-pressed="true"] { background: var(--brand); color: #fff; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .segmented button[aria-pressed="true"] { color: var(--u-ink); } }
 
 /* One cell per day: which days were bad, at a glance. */
 .dayheat { display: flex; gap: 2px; height: 15px; margin: 0 10px; }
@@ -230,7 +289,10 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
               align-items: center; height: 100%; gap: 5px; }
 .curve .fill {
   width: 100%; border-radius: 4px 4px 0 0; min-height: 2px;
-  background: linear-gradient(180deg, var(--red), #ef4444);
+  /* The same coral the timeline strips use for out-of-budget: this chart
+     measures the identical thing by hour, so it must not read as a new colour.
+     Two adjacent steps of the warm ramp, not a darkened tint. */
+  background: linear-gradient(180deg, #f2542d, #d8431f);
   transition: filter .12s;
 }
 .curve .bar:hover .fill { filter: brightness(1.2); }
@@ -251,8 +313,8 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px;
   font-size: 12px; background: var(--panel); color: var(--ink-2);
 }
-.chip[aria-pressed="true"] { background: var(--navy); border-color: var(--navy); color: #fff; }
-@media (prefers-color-scheme: dark) { .chip[aria-pressed="true"] { color: #0f1419; } }
+.chip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: #fff; }
+@media (prefers-color-scheme: dark) { .chip[aria-pressed="true"] { color: var(--u-ink); } }
 .chip .n { opacity: .65; margin-left: 5px; font-variant-numeric: tabular-nums; }
 
 /* ------------------------------------------------------------------- table */
@@ -331,16 +393,18 @@ button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   font-size: 10.5px; font-weight: 600; white-space: nowrap;
   overflow: hidden; text-overflow: ellipsis; max-width: 100%;
 }
+/* Diagnoses run from worst to benign. The label text is always present, so the
+   tint reinforces severity rather than carrying it alone. */
 .dx-under { background: var(--red-soft); color: var(--red); }
 .dx-early { background: var(--amber-soft); color: var(--amber); }
-.dx-thrash { background: #ede9fe; color: #6d28d9; }
+.dx-thrash { background: #e8e9ff; color: #4b50c8; }        /* periwinkle */
 .dx-evening { background: var(--amber-soft); color: var(--amber); }
-.dx-inter { background: #dbeafe; color: #1d4ed8; }
+.dx-inter { background: #f1ffd7; color: #5d7d1f; }         /* lime */
 .dx-healthy { background: var(--green-soft); color: var(--green); }
 .dx-paused { background: var(--line-2); color: var(--ink-2); }
 @media (prefers-color-scheme: dark) {
-  .dx-thrash { background: #2e1f4d; color: #c4b5fd; }
-  .dx-inter { background: #17294d; color: #93c5fd; }
+  .dx-thrash { background: #272b55; color: #babdff; }
+  .dx-inter { background: #303f18; color: #ceff71; }
 }
 .unpriced { color: var(--ink-3); font-style: italic; font-size: 11.5px; }
 
@@ -405,6 +469,17 @@ table.grid th small { display: block; font-size: 9px; font-weight: 500; opacity:
 .axis { display: flex; justify-content: space-between; font-size: 10px; color: var(--ink-3); margin-top: 4px; }
 .drawer h3 { margin: 18px 0 8px; }
 
+/* ------------------------------------------------------------ skipped files */
+
+.skipped-panel { border-left: 4px solid var(--red); }
+.skipped-panel h2 { color: var(--red); }
+#skipped-list { margin-top: 8px; display: grid; gap: 8px; }
+#skipped-list div {
+  background: var(--red-soft); border-radius: 8px; padding: 10px 13px;
+  font-size: 12.5px; color: var(--ink); word-break: break-word;
+}
+#skipped-list b { display: block; margin-bottom: 3px; }
+
 /* ------------------------------------------------------- action log (drawer) */
 
 .act-none, .act-yes {
@@ -421,19 +496,21 @@ table.grid th small { display: block; font-size: 9px; font-weight: 500; opacity:
 table.act-log td { font-size: 11.5px; vertical-align: top; }
 table.act-log td:last-child { color: var(--ink-2); word-break: break-word; }
 
-.pill.act-budget    { background: #dbeafe; color: #1d4ed8; }
-.pill.act-placement { background: #ede9fe; color: #6d28d9; }
-.pill.act-strategy  { background: #fce7f3; color: #be185d; }
+/* Eight action categories, more than the palette has distinct hues. Each pill
+   is labelled, so colour is reinforcement and the two quietest categories can
+   share the neutral tint without ambiguity. */
+.pill.act-budget    { background: #d5f0e7; color: #045f50; }   /* deep green */
+.pill.act-placement { background: #e8e9ff; color: #4b50c8; }   /* periwinkle */
+.pill.act-strategy  { background: var(--red-soft); color: var(--red); }
 .pill.act-bid       { background: var(--green-soft); color: var(--green); }
 .pill.act-targeting { background: var(--amber-soft); color: var(--amber); }
 .pill.act-status    { background: var(--line-2); color: var(--ink-2); }
-.pill.act-structure { background: #e0f2fe; color: #0369a1; }
+.pill.act-structure { background: #f1ffd7; color: #5d7d1f; }   /* lime */
 .pill.act-portfolio { background: var(--line-2); color: var(--ink-2); }
 @media (prefers-color-scheme: dark) {
-  .pill.act-budget    { background: #17294d; color: #93c5fd; }
-  .pill.act-placement { background: #2e1f4d; color: #c4b5fd; }
-  .pill.act-strategy  { background: #401027; color: #f9a8d4; }
-  .pill.act-structure { background: #0c2b3d; color: #7dd3fc; }
+  .pill.act-budget    { background: #0d3f37; color: #6fe0bf; }
+  .pill.act-placement { background: #272b55; color: #babdff; }
+  .pill.act-structure { background: #303f18; color: #ceff71; }
 }
 
 /* ---------------------------------------------------------------- settings */
@@ -443,13 +520,43 @@ dialog {
   background: var(--panel); color: var(--ink); max-width: 440px; box-shadow: var(--shadow);
 }
 dialog::backdrop { background: rgba(16,32,46,.4); }
-dialog label { display: block; margin: 16px 0; font-size: 12.5px; font-weight: 600; }
-dialog input {
+dialog label, .auth label { display: block; margin: 16px 0; font-size: 12.5px; font-weight: 600; }
+dialog input, .auth input {
   display: block; width: 100%; margin-top: 5px; font: inherit; padding: 7px 10px;
   border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink);
 }
-dialog small { display: block; margin-top: 4px; font-weight: 400; color: var(--ink-3); }
+dialog small, .auth small { display: block; margin-top: 4px; font-weight: 400; color: var(--ink-3); }
 dialog menu { display: flex; justify-content: flex-end; gap: 8px; padding: 0; margin: 20px 0 0; }
+
+/* -------------------------------------------------------------- auth pages */
+
+.auth { max-width: 400px; margin: 56px auto; padding: 0 20px; }
+.auth .panel { padding: 24px; }
+.auth h2 { font-size: 17px; margin-bottom: 6px; }
+.auth .primary { width: 100%; margin-top: 6px; }
+.auth .alt { margin-top: 18px; font-size: 12.5px; color: var(--ink-2); text-align: center; }
+.auth .alt a { color: var(--accent); }
+.auth .msg { border-radius: 9px; padding: 10px 12px; font-size: 12.5px; margin-top: 14px; }
+.auth .msg.err { background: var(--red-soft); color: var(--red); }
+.auth .msg.ok { background: var(--green-soft); color: var(--green); }
+.auth .centre { text-align: center; padding: 8px 0 4px; }
+.auth .centre .spinner { margin: 0 auto 14px; }
+
+/* ------------------------------------------------------------------- admin */
+
+.admin { max-width: 1080px; margin: 28px auto; padding: 0 24px; }
+.utable { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.utable th {
+  text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+  color: var(--ink-2); font-weight: 600; padding: 8px 10px; border-bottom: 1px solid var(--line);
+}
+.utable td { padding: 9px 10px; border-bottom: 1px solid var(--line-2); vertical-align: middle; }
+.utable tr:last-child td { border-bottom: 0; }
+.utable .acts { display: flex; gap: 6px; justify-content: flex-end; }
+.utable button { padding: 4px 9px; font-size: 11.5px; }
+.tag-on { background: var(--green-soft); color: var(--green); }
+.tag-off { background: var(--red-soft); color: var(--red); }
+.tag-wait { background: var(--amber-soft); color: var(--amber); }
 
 @media (max-width: 1100px) {
   .thead, .row { grid-template-columns: minmax(160px, 2fr) 66px 60px 56px 150px 160px; }

@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirming your email &middot; Out-of-Budget Dashboard</title>
+<link rel="stylesheet" href="/static/styles.css">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>📉</text></svg>">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <span class="mark"></span>
+    <div>
+      <h1>Out-of-Budget Dashboard</h1>
+      <p>Amazon Ads change history &rarr; which campaigns keep going dark</p>
+    </div>
+  </div>
+</header>
+
+<main class="auth">
+  <div class="panel centre" id="busy-panel">
+    <div class="spinner" aria-hidden="true"></div>
+    <p class="sub">Confirming your email address&hellip;</p>
+    <!-- Shown if the automatic attempt does not run, e.g. scripting is limited. -->
+    <p class="alt"><button type="button" class="primary" id="manual" hidden>Confirm my email</button></p>
+  </div>
+
+  <div class="panel centre" id="ok-panel" hidden>
+    <h2>You are all set</h2>
+    <p class="sub" id="ok-text"></p>
+    <p class="alt"><a href="/login?verified=1">Sign in</a></p>
+  </div>
+
+  <div class="panel" id="bad-panel" hidden>
+    <h2>That link no longer works</h2>
+    <p class="sub" id="bad-text"></p>
+    <form id="resend-form" novalidate>
+      <label>Email
+        <input type="email" id="email" autocomplete="username" required>
+      </label>
+      <button type="submit" class="primary" id="resend">Send me a new link</button>
+    </form>
+    <p id="note" class="msg" hidden></p>
+    <p class="alt"><a href="/login">Back to sign in</a></p>
+  </div>
+</main>
+
+<script src="/static/auth.js"></script>
+<script src="/static/page-verify.js"></script>
+</body>
+</html>

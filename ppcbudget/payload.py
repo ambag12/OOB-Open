@@ -12,11 +12,17 @@ from .ingest import QaReport, WorkbookMeta
 from .metrics import ModelSettings, Totals, hourly_starvation
 from .scoring import IN, NA, OOB, PAUSED, CampaignDay
 
+# The timeline strips are one gradient per campaign-day, so these four values
+# are baked into the payload and have to hold up on both the light and the dark
+# surface. Checked for colour-vision separation across every pair, not just
+# neighbours: the tightest is paused against in-budget at dE 9.3 (protan) and
+# 15.8 with normal vision. Paused is deliberately a cool neutral -- tinting it
+# green to match the brand put it right on top of in-budget.
 TRACK_COLOR = {
-    IN: "#16a34a",
-    OOB: "#dc2626",
-    PAUSED: "#9ca3af",
-    NA: "#e5e7eb",
+    IN: "#0f9a74",       # brand deep green lifted to read on a dark surface
+    OOB: "#f2542d",      # functional warning; the brand guide has no such colour
+    PAUSED: "#9aa6ad",   # nothing is happening, so it recedes
+    NA: "#cbdbd4",       # not yet created: near-absent, labelled in the legend
 }
 STATE_LABEL = {IN: "In budget", OOB: "Out of budget", PAUSED: "Paused", NA: "Not yet created"}
 
@@ -100,6 +106,24 @@ def _quality(qas: list[QaReport], days: list[CampaignDay], totals: Totals,
         if m.status and m.status != "completed":
             add(f"Extraction status - {qa.path.name}", False, m.status,
                 "A partial extraction can be missing whole campaigns, not just rows.")
+        if qa.warning_categories:
+            worst = ", ".join(f"{n}x {c}" for c, n in qa.warning_categories.items())
+            add(f"Exporter warnings - {qa.path.name}", False, worst,
+                "The export recorded its own failures on an 'Errors and Warnings' sheet. "
+                "PARTIAL_PAGE_HARVEST means it collected fewer rows than the page reported, so "
+                "changes are missing and every duration here is a lower bound. Re-run the "
+                "extraction and let it finish. Sample: "
+                + " | ".join(qa.extraction_warnings[:3]))
+
+        if qa.mixed_sources:
+            add(f"Mixed sources - {qa.path.name}", False,
+                f"{len(qa.source_urls)} consoles, {len(qa.row_marketplaces)} marketplaces",
+                "This one file holds rows from more than one Amazon console or marketplace: "
+                + ", ".join(sorted(qa.row_marketplaces)[:4])
+                + ". Account-level spend and ROAS come from a single metadata block, so the "
+                "money figures would be attributed to the wrong marketplace. Export each "
+                "marketplace separately.")
+
         if qa.crossover_violations:
             add("State machines crossed", False, qa.crossover_violations,
                 "A 'Campaign status' row mixed budget and delivery vocabularies, so splitting "

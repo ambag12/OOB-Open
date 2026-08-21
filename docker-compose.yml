@@ -1,0 +1,36 @@
+# The database is the existing RDS instance, so there is no mysql service here.
+# The EC2 host's security group must be allowed inbound on 3306 at RDS.
+
+services:
+  app:
+    build: .
+    image: oob-dashboard:latest
+    container_name: oob-dashboard
+    env_file: .env
+    environment:
+      # Overrides .env: inside the container the workspace lives on the volume.
+      WORKSPACE_ROOT: /srv/work
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3).status == 200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    volumes:
+      # A named volume, not tmpfs: tmpfs is RAM, and a few hundred megabytes of
+      # uploads would come straight out of the memory budget that the analysis
+      # itself needs. The app wipes this directory on startup instead.
+      - workspaces:/srv/work
+    # An OOM then kills and restarts this container rather than the host.
+    mem_limit: 2g
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  workspaces:
