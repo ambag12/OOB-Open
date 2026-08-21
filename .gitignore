@@ -65,3 +65,10 @@ reports/*
 *.xls
 *.csv
 !tests/**/*.csv
+
+# ─── Front end ─────────────────────────────────────────────────────
+# dist/ is already ignored above, but the hosted app serves it, so it has to
+# be built on the box (or in the image) rather than pulled from the repo.
+node_modules/
+*.tsbuildinfo
+npm-debug.log*

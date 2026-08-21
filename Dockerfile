@@ -1,4 +1,22 @@
 # Hosted mode. The local serve.py is not what runs here -- see the CMD.
+
+# ---------------------------------------------------------------- front end --
+# The dashboard and the auth screens are one React app now, so the image has to
+# build it. dist/ is gitignored, and building here rather than copying a local
+# build keeps the image reproducible from a clean checkout.
+FROM node:22-slim AS web
+
+WORKDIR /build
+
+# Lockfile first: this layer stays cached until the dependencies change.
+COPY package.json package-lock.json ./
+RUN npm ci
+
+COPY tsconfig*.json vite.config.ts index.html ./
+COPY src/ ./src/
+RUN npm run build
+
+# ------------------------------------------------------------------ runtime --
 FROM python:3.13-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -26,6 +44,10 @@ COPY --chown=app:app tests/ ./tests/
 # debugging. serve.py is never the container's entrypoint, so its localhost bind
 # and its webbrowser.open are unreachable here.
 COPY --chown=app:app run_report.py serve.py ./
+
+# The built SPA. app/routers/pages.py serves index.html from here for every
+# client route, and /assets is mounted from dist/assets.
+COPY --from=web --chown=app:app /build/dist/ ./dist/
 
 # Scratch space for per-user uploads, writable by the non-root user.
 RUN mkdir -p /srv/work && chown app:app /srv/work

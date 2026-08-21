@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 
+import AccountMenu from './auth/AccountMenu';
 import Dashboard from './components/Dashboard';
 import SettingsDialog from './components/SettingsDialog';
 import Upload from './components/Upload';
@@ -112,22 +113,25 @@ export default function App() {
             </p>
           </div>
         </div>
-        {stage === 'dash' && (
-          <div className="topbar-actions">
-            <button className="ghost" onClick={() => setSettingsOpen(true)}>
-              Assumptions
-            </button>
-            <button className="ghost" disabled={busy !== null} onClick={() => doExport('csv')}>
-              {busy === 'csv' ? 'Writing…' : 'CSV'}
-            </button>
-            <button className="ghost" disabled={busy !== null} onClick={() => doExport('xlsx')}>
-              {busy === 'xlsx' ? 'Building…' : 'Excel'}
-            </button>
-            <button className="ghost danger" onClick={reset}>
-              Start over
-            </button>
-          </div>
-        )}
+        <div className="topbar-actions">
+          {stage === 'dash' && (
+            <>
+              <button className="ghost" onClick={() => setSettingsOpen(true)}>
+                Assumptions
+              </button>
+              <button className="ghost" disabled={busy !== null} onClick={() => doExport('csv')}>
+                {busy === 'csv' ? 'Writing…' : 'CSV'}
+              </button>
+              <button className="ghost" disabled={busy !== null} onClick={() => doExport('xlsx')}>
+                {busy === 'xlsx' ? 'Building…' : 'Excel'}
+              </button>
+              <button className="ghost danger" onClick={reset}>
+                Start over
+              </button>
+            </>
+          )}
+          <AccountMenu />
+        </div>
       </header>
 
       <main>

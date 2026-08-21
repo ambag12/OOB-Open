@@ -39,3 +39,10 @@ Dockerfile
 .dockerignore
 docker-compose.yml
 README.md
+
+# The front end is built inside the image (see the `web` stage), so a local
+# install and a local build are both dead weight in the context -- and a stale
+# dist/ copied in would silently win over the one just built.
+node_modules/
+dist/
+*.tsbuildinfo

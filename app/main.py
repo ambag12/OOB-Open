@@ -19,7 +19,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 from fastapi import FastAPI, Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import delete
 
@@ -36,6 +36,7 @@ log = logging.getLogger(__name__)
 settings = get_settings()
 
 WEB = Path(__file__).resolve().parent.parent / "web"
+DIST = Path(__file__).resolve().parent.parent.parent / "dist"
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 SWEEP_INTERVAL_S = 60
 TOKEN_RETENTION = timedelta(days=7)
@@ -136,7 +137,8 @@ async def guard(request: Request, call_next):
     response.headers.setdefault(
         "Content-Security-Policy",
         "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
-        "script-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+        "script-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; "
+        "base-uri 'none'; form-action 'self'")
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     return response
@@ -152,6 +154,11 @@ app.include_router(admin.router)
 # this with a str.startswith prefix check, which a sibling directory would pass.
 app.mount("/static", StaticFiles(directory=WEB), name="static")
 
+# The hashed bundles Vite emits. Long-lived: the filenames change on every
+# build, so a cached asset can never be the wrong one.
+if (DIST / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
+
 
 @app.get("/statusz", include_in_schema=False)
 def statusz() -> dict:
@@ -159,3 +166,15 @@ def statusz() -> dict:
     store = store_of()
     return {"workspaces": len(store), "bytes": store.total_bytes(),
             "uptime_s": int(time.monotonic() - _STARTED)}
+
+
+# Registered last so it shadows nothing. Any GET that is not an API call, a
+# mounted asset or a route above is a client route -- hand back the app shell
+# and let the router in the browser resolve it.
+@app.get("/{path:path}", include_in_schema=False)
+def spa_fallback(path: str) -> Response:
+    if path.startswith(("api/", "static/", "assets/")):
+        return JSONResponse({"error": "Not found."},
+                            status_code=status.HTTP_404_NOT_FOUND,
+                            headers={"Cache-Control": "no-store"})
+    return pages.shell()
